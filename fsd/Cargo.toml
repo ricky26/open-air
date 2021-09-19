@@ -1,0 +1,11 @@
+[package]
+name = "fsd"
+description = "A library for interacting with FSD (https://github.com/kuroneko/fsd)"
+authors = ["Ricky Taylor <rickytaylor26@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "fsd"
+
+[dependencies]

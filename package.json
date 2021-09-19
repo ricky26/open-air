@@ -1,0 +1,7 @@
+{
+  "name": "open-air",
+  "private": true,
+  "workspaces": [
+    "react-viewer"
+  ]
+}
