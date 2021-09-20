@@ -176,7 +176,7 @@ pub fn parse_longitude(src: &str) -> anyhow::Result<f64> {
 pub fn parse_colour(src: &str) -> anyhow::Result<Colour> {
     let mut chars = src.chars();
     match chars.next() {
-        Some('#' | '$') => Ok(Colour::Value(src[1..].parse::<u32>()?)),
+        Some('#' | '$') => Ok(Colour::Value(u32::from_str_radix(&src[1..], 16)?)),
         Some('%') => {
             let mut parts = src[1..].splitn(3,':');
             let r = parts.next()

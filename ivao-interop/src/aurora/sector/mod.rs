@@ -3,19 +3,47 @@ use std::iter::FromIterator;
 
 use anyhow::anyhow;
 
+use airport::Airport;
 pub use io::{DirectorySource, FileSource};
+use open_air::domain::coords::geo_to_map;
+use visual::Geo;
 
 use crate::aurora::gdf::Statement;
-use crate::aurora::sector::visual::Geo;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
-use open_air::domain::coords::geo_to_map;
+use crate::aurora::sector::visual::FillColor;
 
 mod io;
 mod visual;
 mod convert;
+mod airport;
 
 const INCLUDE_PATH: &str = "Include";
+
+fn load_file_contents(fs: &mut impl FileSource, include_dirs: &[String], name: &str) -> anyhow::Result<Option<Vec<u8>>> {
+    let test_path = format!("{}/{}", INCLUDE_PATH, name);
+
+    if let Some(contents) = fs.read_file(&test_path)? {
+        return Ok(Some(contents));
+    }
+
+    for dir in include_dirs.iter() {
+        let test_path = format!("{}/{}/{}", INCLUDE_PATH, dir, name);
+        if let Some(contents) = fs.read_file(&test_path)? {
+            return Ok(Some(contents));
+        }
+    }
+
+    Ok(None)
+}
+
+fn load_file(fs: &mut impl FileSource, include_dirs: &[String], name: &str) -> anyhow::Result<Option<File>> {
+    Ok(load_file_contents(fs, include_dirs, name)?
+        .map(String::from_utf8)
+        .transpose()?
+        .map(|s| File::parse(&s))
+        .transpose()?)
+}
 
 struct SectionStatementIter<'a, S> {
     fs: &'a mut S,
@@ -32,27 +60,14 @@ impl<'a, S: FileSource> SectionStatementIter<'a, S> {
         }
     }
 
-    fn search_file(&mut self, name: &str) -> anyhow::Result<Vec<u8>> {
-        let test_path = format!("{}/{}", INCLUDE_PATH, name);
-
-        if let Some(contents) = self.fs.read_file(&test_path)? {
-            return Ok(contents);
-        }
-
-        for dir in self.include_dirs.iter() {
-            let test_path = format!("{}/{}/{}", INCLUDE_PATH, dir, name);
-            if let Some(contents) = self.fs.read_file(&test_path)? {
-                return Ok(contents);
-            }
-        }
-
-        Err(anyhow!("unable to find include: {}", name))
+    pub fn from_section(fs: &'a mut S, include_dirs: &[String], section: Option<&Section>) -> SectionStatementIter<'a, S> {
+        Self::new(fs, include_dirs, section.as_ref().map_or(&[], |s| s.statements()))
     }
 
     fn load_file(&mut self, name: Option<&str>) -> anyhow::Result<()> {
         let name = name.ok_or_else(|| anyhow!("missing filename"))?;
-        let contents = String::from_utf8(self.search_file(name)?)?;
-        let file = File::parse(&contents)?;
+        let file = load_file(self.fs, &self.include_dirs, name)?
+            .ok_or_else(|| anyhow!("missing referenced file"))?;
 
         if file.sections().len() != 1 {
             Err(anyhow!("unexpected sections in include: {}", name))?;
@@ -63,7 +78,7 @@ impl<'a, S: FileSource> SectionStatementIter<'a, S> {
             None => return Err(anyhow!("missing empty section")),
         };
 
-        for statement in section.statements() {
+        for statement in section.statements().iter().rev() {
             self.statements.push_front(statement.clone());
         }
 
@@ -85,7 +100,7 @@ impl<'a, S: FileSource> Iterator for SectionStatementIter<'a, S> {
             if parts.next() == Some("F") {
                 // Load a new file
                 if let Err(x) = self.load_file(parts.next()) {
-                    return Some(Err(x))
+                    return Some(Err(x));
                 }
             } else {
                 break Some(Ok(next));
@@ -136,7 +151,9 @@ impl SectorInfo {
 
 pub struct Sector {
     pub info: SectorInfo,
+    pub airports: Vec<Airport>,
     pub geo: Vec<Geo>,
+    pub fill_colors: Vec<FillColor>,
 }
 
 impl Sector {
@@ -147,16 +164,37 @@ impl Sector {
         let info = root_file.section("INFO").ok_or(anyhow!("missing INFO section"))?;
         let info = SectorInfo::from_section(info)?;
 
-        let geo = root_file.section("GEO");
-        let geo = SectionStatementIter::new(
-            fs, &info.include_dirs,
-            geo.as_ref().map_or(&[], |s| s.statements()))
+        let airports = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("AIRPORT"))
+            .map(|s| Airport::parse(&(s?)))
+            .collect::<Result<Vec<Airport>, _>>()?;
+
+        let geo = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("GEO"))
             .map(|s| Geo::parse(&(s?)))
             .collect::<Result<Vec<Geo>, _>>()?;
 
+        let mut fill_colors = Vec::new();
+        FillColor::from_iterator(
+            &mut fill_colors,
+            SectionStatementIter::from_section(fs, &info.include_dirs, root_file.section("FILLCOLOR")))?;
+
+        for airport in airports.iter() {
+            let fill_color_name = format!("{}.tfl", &airport.identifier);
+            if let Some(file) = load_file(fs, &info.include_dirs, &fill_color_name)? {
+                if let Some(section) = file.section("") {
+                    FillColor::from_iterator(
+                        &mut fill_colors,
+                        section.statements().iter().cloned().map(Ok))?;
+                }
+            }
+        }
+
         Ok(Sector {
             info,
+            airports,
             geo,
+            fill_colors,
         })
     }
 

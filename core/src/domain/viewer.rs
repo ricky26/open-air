@@ -153,12 +153,11 @@ impl SectionBuilder {
     }
 
     pub fn apply_by_aabb(&mut self, level: i16, aabb: (f64, f64, f64, f64), mut f: impl FnMut(&mut Section)) {
-        let divisions = 1 << level;
-        let scale = 1. / (divisions as f64);
-        let x_min = (aabb.0.min(aabb.2) / scale).floor() as i16;
-        let x_max = (aabb.0.max(aabb.2) / scale).ceil() as i16;
-        let y_min = (aabb.1.min(aabb.3) / scale).floor() as i16;
-        let y_max = (aabb.1.max(aabb.3) / scale).ceil() as i16;
+        let divisions = (1 << level) as f64;
+        let x_min = (aabb.0.min(aabb.2) * divisions).floor() as i16;
+        let x_max = (aabb.0.max(aabb.2) * divisions).ceil() as i16;
+        let y_min = (aabb.1.min(aabb.3) * divisions).floor() as i16;
+        let y_max = (aabb.1.max(aabb.3) * divisions).ceil() as i16;
 
         for x in x_min..x_max {
             for y in y_min..y_max {

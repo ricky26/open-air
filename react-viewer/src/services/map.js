@@ -6,11 +6,11 @@ const DEBUG_SECTIONS = false;
 
 const PALETTE = {
   COAST: '#444',
-  PIER: 'black',
+  PIER: '#444',
   DANGER: '#4027bd',
   RESTRICT: '#4027bd',
   PROHIBIT: '#4027bd',
-  TAXI_CENTER: 'white',
+  TAXI_CENTER: '#0d0',
   RUNWAY: '#7b6245',
   STOPBAR: 'white',
   STOPLINE: 'white',
@@ -32,7 +32,7 @@ function rgbToStr(r, g, b) {
 
 function parseStyle(style) {
   if (typeof style === 'number') {
-    const s = '000000' + style.toFixed();
+    const s = '000000' + style.toString(16);
     return `#${s.substring(s.length - 6)}`;
   }
 
@@ -42,6 +42,42 @@ function parseStyle(style) {
   }
 
   return null;
+}
+
+function normaliseAabb(a) {
+  if (a[2] < a[0]) {
+    const q = a[0];
+    a[0] = a[2];
+    a[2] = q;
+  }
+
+  if (a[3] < a[1]) {
+    const q = a[1];
+    a[1] = a[3];
+    a[3] = q;
+  }
+}
+
+function aabbIntersects(a, b) {
+  normaliseAabb(a);
+  normaliseAabb(b);
+
+  const aw = a[2] - a[0];
+  const ah = a[3] - a[1];
+  const acx = (a[0] + a[2]) * 0.5;
+  const acy = (a[1] + a[3]) * 0.5;
+
+  const bw = b[2] - b[0];
+  const bh = b[3] - b[1];
+  const bcx = (b[0] + b[2]) * 0.5;
+  const bcy = (b[1] + b[3]) * 0.5;
+
+  const distX = Math.abs(acx - bcx);
+  const distY = Math.abs(acy - bcy);
+  const width = 0.5 * (aw + bw);
+  const height = 0.5 * (ah + bh);
+
+  return (distX < width) && (distY < height);
 }
 
 export class SectionSource {
@@ -195,7 +231,7 @@ export class TileCache {
 export class MapService {
   constructor() {
     this.sectionSource = new SectionSource();
-    this.tileCache = new TileCache(1024, 64);
+    this.tileCache = new TileCache(1024, 16);
   }
 
   get tileSize() {
@@ -230,13 +266,15 @@ export class MapService {
     const ctx = this.tileCache.context;
     const divisions = 1 << level;
     const scale = 1 / divisions;
-    const offsetX = x * scale;
-    const offsetY = y * scale;
-    ctx.transform(divisions, 0, 0, divisions, -x, -y);
+    const minX = x * scale;
+    const minY = y * scale;
+    const maxX = minX + scale;
+    const maxY = minY + scale;
+    const sectionAabb = [minX, minY, maxX, maxY];
 
     if (DEBUG_SECTIONS) {
       ctx.beginPath();
-      ctx.rect(offsetX, offsetY, scale, scale);
+      ctx.rect(0, 0, 1, 1);
       ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 0.05));
       ctx.fill();
     }
@@ -244,6 +282,10 @@ export class MapService {
     for (const shape of section.shapes) {
       const strokeStyle = parseStyle(shape.strokeColour);
       const fillStyle = parseStyle(shape.fillColour);
+
+      if (!aabbIntersects(sectionAabb, shape.mapAabb)) {
+        continue;
+      }
 
       if (!strokeStyle && !fillStyle) {
         console.log('no style', shape.fillColour, shape.strokeColour);
@@ -253,18 +295,27 @@ export class MapService {
       let first = true;
       ctx.beginPath();
       for (const [px, py] of shape.mapPoints) {
+        const tx = (px - minX) * divisions;
+        const ty = (py - minY) * divisions;
+
         if (first) {
-          ctx.moveTo(px, py);
+          ctx.moveTo(tx, ty);
           first = false;
         } else {
-          ctx.lineTo(px, py);
+          ctx.lineTo(tx, ty);
         }
       }
 
       if (strokeStyle) {
         ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = 0.5 * shape.strokeWidth / ((1 << Math.min(13, level)) * this.tileSize);
+        ctx.lineWidth = shape.strokeWidth / this.tileSize;
         ctx.stroke();
+      }
+
+      if (fillStyle) {
+        ctx.closePath();
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
       }
     }
 
@@ -307,14 +358,36 @@ export class MapService {
     this.tileCache.draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh, index);
   }
 
-  draw(ctx, x, y, w, h, level) {
+  tileRange(x, y, w, h, level) {
     const divisions = 1 << level;
     const scale = 1 / divisions;
     const minX = Math.floor(x * divisions);
     const maxX = Math.ceil((x + w) * divisions);
     const minY = Math.floor(y * divisions);
     const maxY = Math.ceil((y + h) * divisions);
+    return [minX, minY, maxX, maxY, divisions, scale];
+  }
 
+  preload(x, y, w, h, level) {
+    const [minX, minY, maxX, maxY] = this.tileRange(x, y, w, h, level);
+
+    for (let x = minX; x < maxX; ++x) {
+      for (let y = minY; y < maxY; ++y) {
+        this.renderTile(level, x, y);
+      }
+    }
+  }
+
+  draw(ctx, x, y, w, h, level) {
+    if (level > 1) {
+      this.preload(x, y, w, h, level - 2);
+    }
+
+    if (level > 0) {
+      this.preload(x, y, w, h, level - 1);
+    }
+
+    const [minX, minY, maxX, maxY,, scale] = this.tileRange(x, y, w, h, level);
     for (let x = minX; x < maxX; ++x) {
       for (let y = minY; y < maxY; ++y) {
         this.drawTile(ctx, level, x, y, x * scale, y * scale, scale, scale);
