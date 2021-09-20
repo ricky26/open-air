@@ -5,6 +5,8 @@ export const DEG2RAD = Math.PI / 180;
 export const RAD2DEG = 180 / Math.PI;
 const MAX_SECTION_LEVEL = 8;
 const DEBUG_SECTIONS = false;
+const TEXT_SCALE = 0.5;
+const FONT_FAMILY = 'Roboto';
 
 const PALETTE = {
   COAST: '#444',
@@ -113,12 +115,15 @@ function aabbIntersects(a, b) {
   return (distX < width) && (distY < height);
 }
 
-function createCanvas({width, height}) {
+function createCanvas() {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
   const context = canvas.getContext("2d");
   return {canvas, context};
+}
+
+function freeCanvas({canvas}) {
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
 export class SectionSource {
@@ -180,6 +185,18 @@ export class MapService {
     this.quota = 0;
   }
 
+  sectionData(level, x, y) {
+    const dataLevel = Math.min(MAX_SECTION_LEVEL, level);
+    let dataX = x;
+    let dataY = y;
+    if (dataLevel !== level) {
+      dataX = x >> (level - dataLevel);
+      dataY = y >> (level - dataLevel);
+    }
+
+    return this.sectionSource.getSection(dataLevel, dataX, dataY);
+  }
+
   renderShapes(level, x, y) {
     const key = `shapes_${level}_${x}_${y}`;
     let index = this.tileCache.use(key);
@@ -191,25 +208,17 @@ export class MapService {
       return null;
     }
 
-    const dataLevel = Math.min(MAX_SECTION_LEVEL, level);
-    let dataX = x;
-    let dataY = y;
-    if (dataLevel !== level) {
-      dataX = x >> (level - dataLevel);
-      dataY = y >> (level - dataLevel);
-    }
-
-    const section = this.sectionSource.getSection(dataLevel, dataX, dataY);
+    const section = this.sectionData(level, x, y);
     if (section === null) {
       return null;
     }
 
     this.quota--;
     return this.tileCache.allocate(key, () => {
-      const {canvas, context: ctx} = createCanvas({
-        width: this.tileSize,
-        height: this.tileSize,
-      });
+      const {canvas, context: ctx} = createCanvas();
+      canvas.width = this.tileSize;
+      canvas.height = this.tileSize;
+
       const divisions = 1 << level;
       const scale = 1 / divisions;
       const minX = x * scale;
@@ -267,11 +276,8 @@ export class MapService {
       }
 
       ctx.restore();
-      return canvas;
-    }, canvas => {
-      canvas.width = 0;
-      canvas.height = 0;
-    });
+      return {canvas};
+    }, freeCanvas);
   }
 
   drawShapes(ctx, level, x, y, dx, dy, dw, dh) {
@@ -306,7 +312,61 @@ export class MapService {
       sh >>= deltaLevel;
     }
 
-    ctx.drawImage(entry.value, sx, sy, sw, sh, dx, dy, dw, dh);
+    ctx.drawImage(entry.value.canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+  }
+
+  drawLabels(ctx, level, pixelScale, x, y, dx, dy, dw, dh) {
+    const section = this.sectionData(level, x, y);
+    if (section === null) {
+      return;
+    }
+
+    const divisions = 1 << level;
+    const scale = 1 / divisions;
+    const worldMinX = x * scale;
+    const worldMinY = y * scale;
+
+    for (const label of section.labels) {
+      const fontSize = label.fontSize * TEXT_SCALE * (1.1 ** level);
+      if (fontSize < 8) {
+        continue;
+      }
+
+      const key = `label_${level}_${label.text}`;
+      const entry = this.tileCache.allocate(key, () => {
+        const {canvas, context} = createCanvas();
+        const font = `${fontSize}pt ${FONT_FAMILY}`;
+
+        // Calculate text size.
+        context.font = font;
+        context.textAlign = 'left';
+        context.textBaseline = 'top';
+        const {width, actualBoundingBoxDescent: height} = context.measureText(label.text);
+        canvas.width = width + 12;
+        canvas.height = height + 12;
+
+        // Render text
+        context.font = font;
+        context.textAlign = 'left';
+        context.textBaseline = 'top';
+        context.fillStyle = 'white';
+        context.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        context.shadowBlur = 4;
+        context.fillText(label.text, 6, 6);
+
+        return {canvas};
+      }, freeCanvas);
+      if (entry === null) {
+        continue;
+      }
+
+      const x = dx + (label.mapPosition[0] - worldMinX) / scale * dw;
+      const y = dy + (label.mapPosition[1] - worldMinY) / scale * dh;
+      const {canvas} = entry.value;
+      const w = canvas.width / pixelScale;
+      const h = canvas.height / pixelScale;
+      ctx.drawImage(canvas, x - w * 0.5, y - h * 0.5, w, h);
+    }
   }
 
   tileRange(x, y, w, h, level) {
@@ -329,7 +389,7 @@ export class MapService {
     }
   }
 
-  draw(ctx, x, y, w, h, level) {
+  draw(ctx, x, y, w, h, level, pixelScale) {
     if (level > 1) {
       this.preload(x, y, w, h, level - 2);
     }
@@ -339,19 +399,25 @@ export class MapService {
     }
 
     const [minX, minY, maxX, maxY, , scale] = this.tileRange(x, y, w, h, level);
-    for (let x = minX; x < maxX; ++x) {
-      for (let y = minY; y < maxY; ++y) {
-        this.drawShapes(ctx, level, x, y, x * scale, y * scale, scale, scale);
+
+    // Render base geometry.
+    for (let tx = minX; tx < maxX; ++tx) {
+      for (let ty = minY; ty < maxY; ++ty) {
+        this.drawShapes(ctx, level, tx, ty, tx * scale, ty * scale, scale, scale);
+      }
+    }
+
+    // Render labels
+    for (let tx = minX; tx < maxX; ++tx) {
+      for (let ty = minY; ty < maxY; ++ty) {
+        this.drawLabels(ctx, level, pixelScale, tx, ty, tx * scale, ty * scale, scale, scale);
       }
     }
   }
 }
 
-MapService
-  .Context = createContext(new MapService());
+MapService.Context = createContext(new MapService());
 
-export function
-
-useMap() {
+export function useMap() {
   return useContext(MapService.Context);
 }

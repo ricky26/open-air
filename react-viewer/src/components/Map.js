@@ -63,7 +63,7 @@ export default function Map(props) {
       const worldH = maxY - minY;
 
       mapService.quota = 1;
-      mapService.draw(ctx, minX, minY, worldW, worldH, level);
+      mapService.draw(ctx, minX, minY, worldW, worldH, level, scale);
 
       if (running) {
         requestAnimationFrame(draw);
@@ -131,7 +131,7 @@ export default function Map(props) {
 
     const newTransform = {
       ...transform.current,
-      zoom: transform.current.zoom - zoomDelta,
+      zoom: Math.max(0, transform.current.zoom - zoomDelta),
     };
 
     // Reposition so the cursor is over the same position it was before.
