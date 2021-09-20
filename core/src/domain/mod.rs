@@ -19,7 +19,7 @@ pub enum FixKind {
 pub enum PointKind {
     FIX { kind: FixKind, is_boundary: bool },
     VOR { frequency: u16 },
-    NBD { frequency: u16 },
+    NDB { frequency: u16 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

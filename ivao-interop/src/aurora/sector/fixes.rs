@@ -6,7 +6,7 @@ use open_air::domain;
 use open_air::domain::PointKind;
 
 use crate::aurora::gdf::Statement;
-use crate::aurora::sector::parsing::parse_string_position;
+use crate::aurora::sector::parsing::{parse_string_position, frequency_to_int};
 use crate::aurora::sector::Sector;
 
 #[derive(Debug, Clone, Copy)]
@@ -58,10 +58,10 @@ impl Fix {
             .ok_or_else(|| anyhow!("missing identifier"))?
             .to_owned();
         let geo_position = parse_string_position(&mut parts)?;
-        let fix_type = parts.next()
-            .ok_or_else(|| anyhow!("missing fix type"))?
-            .parse::<i32>()?
-            .try_into()?;
+        let fix_type = match parts.next() {
+            Some(value) => value.parse::<i32>()?.try_into()?,
+            None => FixType::Hidden,
+        };
         let boundary = parts.next() == Some("1");
 
         Ok(Fix {
@@ -80,6 +80,87 @@ impl Fix {
             kind: PointKind::FIX {
                 kind: self.fix_type.into(),
                 is_boundary: self.boundary,
+            },
+            name: self.identifier.clone(),
+            position,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NDB {
+    pub identifier: String,
+    pub frequency: String,
+    pub geo_position: (String, String),
+}
+
+impl NDB {
+    pub fn parse(statement: &Statement) -> anyhow::Result<NDB> {
+        let mut parts = statement.parts();
+
+        let identifier = parts.next()
+            .ok_or_else(|| anyhow!("missing identifier"))?
+            .to_owned();
+        let frequency = parts.next()
+            .ok_or_else(|| anyhow!("missing frequency"))?
+            .to_owned();
+        let geo_position = parse_string_position(&mut parts)?;
+
+        Ok(NDB {
+            identifier,
+            frequency,
+            geo_position,
+        })
+    }
+
+    pub fn to_domain(&self, sector: &Sector) -> anyhow::Result<domain::Point> {
+        let position = sector.lookup_map_position(
+            &self.geo_position.0,
+            &self.geo_position.1)?;
+        Ok(domain::Point {
+            kind: PointKind::NDB {
+                frequency: frequency_to_int(&self.frequency)?,
+            },
+            name: self.identifier.clone(),
+            position,
+        })
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct VOR {
+    pub identifier: String,
+    pub frequency: String,
+    pub geo_position: (String, String),
+}
+
+impl VOR {
+    pub fn parse(statement: &Statement) -> anyhow::Result<VOR> {
+        let mut parts = statement.parts();
+
+        let identifier = parts.next()
+            .ok_or_else(|| anyhow!("missing identifier"))?
+            .to_owned();
+        let frequency = parts.next()
+            .ok_or_else(|| anyhow!("missing frequency"))?
+            .to_owned();
+        let geo_position = parse_string_position(&mut parts)?;
+
+        Ok(VOR {
+            identifier,
+            frequency,
+            geo_position,
+        })
+    }
+
+    pub fn to_domain(&self, sector: &Sector) -> anyhow::Result<domain::Point> {
+        let position = sector.lookup_map_position(
+            &self.geo_position.0,
+            &self.geo_position.1)?;
+        Ok(domain::Point {
+            kind: PointKind::VOR {
+                frequency: frequency_to_int(&self.frequency)?,
             },
             name: self.identifier.clone(),
             position,

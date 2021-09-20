@@ -13,7 +13,7 @@ use visual::Geo;
 
 use crate::aurora::gdf::{parse_colour, Statement};
 use crate::aurora::sector::airport::{Gate, Runway, Taxiway};
-use crate::aurora::sector::fixes::Fix;
+use crate::aurora::sector::fixes::{Fix, NDB, VOR};
 use crate::aurora::sector::visual::FillColor;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
@@ -180,6 +180,8 @@ pub struct Sector {
     pub gates: Vec<Gate>,
 
     pub fixes: Vec<Fix>,
+    pub ndbs: Vec<NDB>,
+    pub vors: Vec<VOR>,
 
     pub defines: HashMap<String, Colour>,
     pub geo: Vec<Geo>,
@@ -242,6 +244,20 @@ impl Sector {
             .filter_map(warn_filter)
             .collect();
 
+        let ndbs = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("NDB"))
+            .filter_map(warn_filter)
+            .map(|s| NDB::parse(&s))
+            .filter_map(warn_filter)
+            .collect();
+
+        let vors = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("VOR"))
+            .filter_map(warn_filter)
+            .map(|s| VOR::parse(&s))
+            .filter_map(warn_filter)
+            .collect();
+
         let geo = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("GEO"))
             .filter_map(warn_filter)
@@ -296,6 +312,8 @@ impl Sector {
             gates,
 
             fixes,
+            ndbs,
+            vors,
 
             defines,
             geo,

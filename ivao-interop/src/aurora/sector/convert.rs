@@ -330,6 +330,10 @@ impl Sector {
         }
 
         for airport in self.airports.iter() {
+            if airport.hide_tag {
+                continue;
+            }
+
             let map_position = self.lookup_map_position(
                 &airport.geo_position.0, &airport.geo_position.1)?;
             let map_aabb = (map_position.0, map_position.1, map_position.0, map_position.1);
@@ -382,11 +386,14 @@ impl Sector {
             }
         }
 
-        for fix in self.fixes.iter() {
-            let domain = match fix.to_domain(self) {
+        let fixes = self.fixes.iter().map(|s| (&s.identifier, s.to_domain(self)))
+            .chain(self.ndbs.iter().map(|s| (&s.identifier, s.to_domain(self))))
+            .chain(self.vors.iter().map(|s| (&s.identifier, s.to_domain(self))));
+        for (name, fix) in fixes {
+            let domain = match fix {
                 Ok(v) => v,
                 Err(err) => {
-                    warn!("error converting fix {:?}: {}", fix, err);
+                    warn!("error converting fix {}: {}", name, err);
                     continue;
                 }
             };
