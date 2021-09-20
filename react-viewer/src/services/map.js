@@ -2,11 +2,24 @@ import {createContext, useContext} from "react";
 
 export const DEG2RAD = Math.PI / 180;
 export const RAD2DEG = 180 / Math.PI;
-export const SECTION_DEGREES = 10;
+const DEBUG_SECTIONS = false;
 
-function hsv2rgb(h,s,v) {
-  let f= (n,k=(n+h/60)%6) => v - v*s*Math.max( Math.min(k,4-k,1), 0);
-  return [f(5),f(3),f(1)];
+const PALETTE = {
+  COAST: '#444',
+  PIER: 'black',
+  DANGER: '#4027bd',
+  RESTRICT: '#4027bd',
+  PROHIBIT: '#4027bd',
+  TAXI_CENTER: 'white',
+  RUNWAY: '#7b6245',
+  STOPBAR: 'white',
+  STOPLINE: 'white',
+  BUILDING: 'black',
+};
+
+function hsv2rgb(h, s, v) {
+  let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
+  return [f(5), f(3), f(1)];
 }
 
 function rgbToStr(r, g, b) {
@@ -17,28 +30,36 @@ function rgbToStr(r, g, b) {
   return `#${f(r)}${f(g)}${f(b)}`;
 }
 
+function parseStyle(style) {
+  if (typeof style === 'number') {
+    const s = '000000' + style.toFixed();
+    return `#${s.substring(s.length - 6)}`;
+  }
+
+  const palette = PALETTE[style];
+  if (palette !== undefined) {
+    return palette;
+  }
+
+  return null;
+}
+
 export class SectionSource {
   constructor() {
     this.entries = {};
   }
 
   number(v) {
-    let prefix = '+';
-    if (v < 0) {
-      prefix = '-';
-      v = -v;
-    }
-
     const digits = '000' + v.toFixed();
-    return prefix + digits.substring(digits.length - 3);
+    return digits.substring(digits.length - 3);
   }
 
-  key(x, y) {
-    return `section_${this.number(x)}_${this.number(y)}`;
+  key(level, x, y) {
+    return `section_${this.number(level)}_${this.number(x)}_${this.number(y)}`;
   }
 
-  createEntry(x, y) {
-    const key = this.key(x, y);
+  createEntry(level, x, y) {
+    const key = this.key(level, x, y);
     const entry = this.entries[key];
     if (entry === undefined) {
       // New section, start downloading it.
@@ -68,28 +89,25 @@ export class SectionSource {
     return entry;
   }
 
-  getSection(x, y) {
-    const entry = this.createEntry(x, y);
+  getSection(level, x, y) {
+    const entry = this.createEntry(level, x, y);
     return entry.value;
-  }
-
-  async fetchSection(x, y) {
-    const entry = this.createEntry(x, y);
-    return entry.promise ? entry.promise : entry.value;
   }
 }
 
 export class TileCache {
   constructor(size, count) {
     this.size = size;
+    this.rows = Math.ceil(Math.log2(count));
     this.canvas = document.createElement('canvas');
-    this.canvas.width = size * count;
-    this.canvas.height = size;
+    this.canvas.width = size * this.rows;
+    this.canvas.height = size * this.rows;
     this.context = this.canvas.getContext("2d");
     this.sequence = 0;
     this.entries = {};
     this.free = [];
-    for (let i = 0; i < count; ++i) {
+
+    for (let i = 0; i < this.rows * this.rows; ++i) {
       this.free.push(i);
     }
   }
@@ -151,11 +169,12 @@ export class TileCache {
       return null;
     }
 
-    const x = index * this.size;
-    this.context.setTransform(this.size, 0, 0, this.size, x, 0);
+    const x = (index % this.rows) * this.size;
+    const y = Math.floor(index / this.rows) * this.size;
+    this.context.save();
+    this.context.setTransform(this.size, 0, 0, this.size, x, y);
     this.context.beginPath();
-    this.context.rect(0, 0, this.size, this.size);
-    this.context.closePath();
+    this.context.rect(0, 0, 1, 1);
     this.context.clip();
     this.context.clearRect(0, 0, 1, 1);
     return index;
@@ -166,26 +185,39 @@ export class TileCache {
     return (entry === undefined) ? null : entry.allocated;
   }
 
-  draw(ctx, x, y, w, h, idx) {
-    const ox = idx * this.size;
-    ctx.drawImage(this.canvas, ox, 0, this.size, this.size, x, y, w, h);
+  draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh, idx) {
+    const ox = (idx % this.rows) * this.size;
+    const oy = Math.floor(idx / this.rows) * this.size;
+    ctx.drawImage(this.canvas, ox + sx, oy + sy, sw, sh, dx, dy, dw, dh);
   }
 }
 
 export class MapService {
   constructor() {
     this.sectionSource = new SectionSource();
-    this.tileCache = new TileCache(512, 32);
+    this.tileCache = new TileCache(1024, 64);
   }
 
-  renderTile(x, y) {
-    const key = `${x},${y}`;
+  get tileSize() {
+    return this.tileCache.size;
+  }
+
+  renderTile(level, x, y) {
+    const key = `${level},${x},${y}`;
     let index = this.tileCache.use(key);
     if (index !== null) {
       return index;
     }
 
-    const section = this.sectionSource.getSection(x, y);
+    const dataLevel = Math.min(7, level);
+    let dataX = x;
+    let dataY = y;
+    if (dataLevel !== level) {
+      dataX = x >> (level - dataLevel);
+      dataY = y >> (level - dataLevel);
+    }
+
+    const section = this.sectionSource.getSection(Math.min(7, level), dataX, dataY);
     if (section === null) {
       return null;
     }
@@ -196,20 +228,31 @@ export class MapService {
     }
 
     const ctx = this.tileCache.context;
-    const divisor = 1 / SECTION_DEGREES;
-    const offsetX = x / SECTION_DEGREES;
-    const offsetY = y / SECTION_DEGREES;
-    ctx.transform(divisor, 0, 0, divisor, -offsetX, -offsetY);
+    const divisions = 1 << level;
+    const scale = 1 / divisions;
+    const offsetX = x * scale;
+    const offsetY = y * scale;
+    ctx.transform(divisions, 0, 0, divisions, -x, -y);
 
-    ctx.beginPath();
-    ctx.rect(x, y, SECTION_DEGREES, SECTION_DEGREES);
-    ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 0.5));
-    ctx.fill();
+    if (DEBUG_SECTIONS) {
+      ctx.beginPath();
+      ctx.rect(offsetX, offsetY, scale, scale);
+      ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 0.05));
+      ctx.fill();
+    }
 
     for (const shape of section.shapes) {
+      const strokeStyle = parseStyle(shape.strokeColour);
+      const fillStyle = parseStyle(shape.fillColour);
+
+      if (!strokeStyle && !fillStyle) {
+        console.log('no style', shape.fillColour, shape.strokeColour);
+        continue;
+      }
+
       let first = true;
       ctx.beginPath();
-      for (const [px, py] of shape.points) {
+      for (const [px, py] of shape.mapPoints) {
         if (first) {
           ctx.moveTo(px, py);
           first = false;
@@ -218,28 +261,63 @@ export class MapService {
         }
       }
 
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 0.01;
-      ctx.stroke();
+      if (strokeStyle) {
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = 0.5 * shape.strokeWidth / ((1 << Math.min(13, level)) * this.tileSize);
+        ctx.stroke();
+      }
     }
 
+    ctx.restore();
     return index;
   }
 
-  draw(ctx, x, y, w, h, scaleX, scaleY) {
-    const minX = Math.floor(x / SECTION_DEGREES) * SECTION_DEGREES;
-    const maxX = Math.ceil((x + w) / SECTION_DEGREES) * SECTION_DEGREES;
-    const minY = Math.floor(y / SECTION_DEGREES) * SECTION_DEGREES;
-    const maxY = Math.ceil((y + h) / SECTION_DEGREES) * SECTION_DEGREES;
+  drawTile(ctx, level, x, y, dx, dy, dw, dh) {
+    let index = this.renderTile(level, x, y);
+    let drawLevel = level;
 
-    for (let x = minX; x < maxX; x += SECTION_DEGREES) {
-      for (let y = minY; y < maxY; y += SECTION_DEGREES) {
-        let index = this.renderTile(x, y);
-        if (index === null) {
-          continue;
-        }
+    while ((index === null) && (drawLevel > 0)) {
+      // It's not ready yet, check lower levels.
+      drawLevel--;
 
-        this.tileCache.draw(ctx, x, y, SECTION_DEGREES, SECTION_DEGREES, index);
+      const dx = x >> (level - drawLevel);
+      const dy = y >> (level - drawLevel);
+
+      const key = `${drawLevel},${dx},${dy}`;
+      index = this.tileCache.use(key);
+    }
+
+    if (index === null) {
+      return;
+    }
+
+    const tileSize = this.tileSize;
+    let sx = 0, sy = 0, sw = tileSize, sh = tileSize;
+
+    if (drawLevel < level) {
+      const deltaLevel = level - drawLevel;
+      const deltaBit = 1 << deltaLevel;
+      const deltaBits = deltaBit - 1;
+      sx = (x & deltaBits) * (tileSize / deltaBit);
+      sy = (y & deltaBits) * (tileSize / deltaBit);
+      sw >>= deltaLevel;
+      sh >>= deltaLevel;
+    }
+
+    this.tileCache.draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh, index);
+  }
+
+  draw(ctx, x, y, w, h, level) {
+    const divisions = 1 << level;
+    const scale = 1 / divisions;
+    const minX = Math.floor(x * divisions);
+    const maxX = Math.ceil((x + w) * divisions);
+    const minY = Math.floor(y * divisions);
+    const maxY = Math.ceil((y + h) * divisions);
+
+    for (let x = minX; x < maxX; ++x) {
+      for (let y = minY; y < maxY; ++y) {
+        this.drawTile(ctx, level, x, y, x * scale, y * scale, scale, scale);
       }
     }
   }

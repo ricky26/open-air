@@ -2,7 +2,8 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use crate::domain::{Point, Airspace};
+
+use crate::domain::{Airspace, Point};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Palette(pub HashMap<String, u32>);
@@ -12,6 +13,15 @@ pub struct Palette(pub HashMap<String, u32>);
 pub enum Colour {
     Reference(String),
     Value(u32),
+}
+
+impl Colour {
+    pub fn capitalise(&self) -> Self {
+        match self {
+            Colour::Value(v) => Colour::Value(*v),
+            Colour::Reference(name) => Colour::Reference(name.to_uppercase()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,16 +46,16 @@ pub struct LayerFilter(pub Vec<LayerFilterOp>);
 pub struct Label {
     pub text: String,
     pub font_size: f32,
-    pub position: (f64, f64),
+    pub map_position: (f64, f64),
 
     pub filter: LayerFilter,
-    pub aabb: (f64, f64, f64, f64),
+    pub map_aabb: (f64, f64, f64, f64),
 }
 
 impl Label {
     pub fn recalculate_aabb(&mut self) {
-        let (x, y) = self.position;
-        self.aabb = (x - 1., y - 1., x + 1., y + 1.);
+        let (x, y) = self.map_position;
+        self.map_aabb = (x - 1., y - 1., x + 1., y + 1.);
     }
 }
 
@@ -55,15 +65,15 @@ pub struct Shape {
     pub fill_colour: Option<Colour>,
     pub stroke_colour: Option<Colour>,
     pub stroke_width: f32,
-    pub points: Vec<(f64, f64)>,
+    pub map_points: Vec<(f64, f64)>,
 
     pub filter: LayerFilter,
-    pub aabb: (f64, f64, f64, f64),
+    pub map_aabb: (f64, f64, f64, f64),
 }
 
 impl Shape {
     pub fn recalculate_aabb(&mut self) {
-        let mut points = self.points.iter().cloned();
+        let mut points = self.map_points.iter().cloned();
         let mut aabb = match points.next() {
             Some((x, y)) => (x, y, x, y),
             None => (0., 0., 0., 0.),
@@ -76,7 +86,7 @@ impl Shape {
             aabb.3 = aabb.3.max(y);
         }
 
-        self.aabb = aabb;
+        self.map_aabb = aabb;
     }
 }
 
@@ -89,7 +99,8 @@ pub struct Global {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Section {
-    pub aabb: (f64, f64, f64, f64),
+    pub division: (i16, i16, i16),
+    pub map_aabb: (f64, f64, f64, f64),
 
     pub labels: Vec<Label>,
     pub shapes: Vec<Shape>,
@@ -100,48 +111,58 @@ pub struct Section {
 
 pub struct SectionBuilder {
     global: Global,
-    sections: HashMap<(i16, i16), Section>,
+    levels: i16,
+    sections: HashMap<(i16, i16, i16), Section>,
 }
 
 impl SectionBuilder {
-    const SCALE: f64 = 10.;
-
-    pub fn new() -> SectionBuilder {
+    pub fn new(levels: i16) -> SectionBuilder {
         SectionBuilder {
             global: Global::default(),
+            levels,
             sections: HashMap::new(),
         }
+    }
+
+    pub fn levels(&self) -> i16 {
+        self.levels
     }
 
     pub fn global_mut(&mut self) -> &mut Global {
         &mut self.global
     }
 
-    fn create_section(&mut self, x: i16, y: i16) -> &mut Section {
-        if !self.sections.contains_key(&(x, y)) {
-            self.sections.insert((x, y), Section{
-                aabb: (
-                    (x as f64) * Self::SCALE,
-                    (y as f64) * Self::SCALE,
-                    ((x + 1) as f64) * Self::SCALE,
-                    ((y + 1) as f64) * Self::SCALE,
+    fn create_section(&mut self, level: i16, x: i16, y: i16) -> &mut Section {
+        if !self.sections.contains_key(&(level, x, y)) {
+            let divisions = 1 << level;
+            let scale = 1. / (divisions as f64);
+
+            self.sections.insert((level, x, y), Section {
+                division: (level, x, y),
+                map_aabb: (
+                    (x as f64) * scale,
+                    (y as f64) * scale,
+                    ((x + 1) as f64) * scale,
+                    ((y + 1) as f64) * scale,
                 ),
                 ..Default::default()
             });
         }
 
-        self.sections.get_mut(&(x, y)).unwrap()
+        self.sections.get_mut(&(level, x, y)).unwrap()
     }
 
-    pub fn apply_by_aabb(&mut self, aabb: (f64, f64, f64, f64), mut f: impl FnMut(&mut Section)) {
-        let x_min = (aabb.0.min(aabb.2) / Self::SCALE).floor() as i16;
-        let x_max = (aabb.0.max(aabb.2) / Self::SCALE).ceil() as i16;
-        let y_min = (aabb.1.min(aabb.3) / Self::SCALE).floor() as i16;
-        let y_max = (aabb.1.max(aabb.3) / Self::SCALE).ceil() as i16;
+    pub fn apply_by_aabb(&mut self, level: i16, aabb: (f64, f64, f64, f64), mut f: impl FnMut(&mut Section)) {
+        let divisions = 1 << level;
+        let scale = 1. / (divisions as f64);
+        let x_min = (aabb.0.min(aabb.2) / scale).floor() as i16;
+        let x_max = (aabb.0.max(aabb.2) / scale).ceil() as i16;
+        let y_min = (aabb.1.min(aabb.3) / scale).floor() as i16;
+        let y_max = (aabb.1.max(aabb.3) / scale).ceil() as i16;
 
         for x in x_min..x_max {
             for y in y_min..y_max {
-                f(self.create_section(x, y));
+                f(self.create_section(level, x, y));
             }
         }
     }

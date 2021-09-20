@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 
     let opts = Opts::parse();
     let mut source = DirectorySource::new(opts.input.clone());
-    let mut builder = SectionBuilder::new();
+    let mut builder = SectionBuilder::new(8);
 
     for path in opts.sector_files {
         let sector = Sector::parse(&mut source, &path)?;
@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
 
     let (global, sections) = builder.build();
     for section in sections {
-        let name = format!("section_{:+04.0}_{:+04.0}.json", section.aabb.0, section.aabb.1);
+        let name = format!("section_{:03}_{:03}_{:03}.json", section.division.0, section.division.1, section.division.2);
         let contents = serde_json::to_string_pretty(&section)?;
         let abs_path = opts.output.join(name);
         std::fs::write(&abs_path, &contents)?;

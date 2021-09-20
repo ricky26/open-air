@@ -37,8 +37,8 @@ impl Geo {
         }
 
         Ok(Geo {
-            start: (start_long, start_lat),
-            end: (end_long, end_lat),
+            start: (start_lat, start_long),
+            end: (end_lat, end_long),
             color,
         })
     }

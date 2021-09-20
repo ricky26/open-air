@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod viewer;
+pub mod coords;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

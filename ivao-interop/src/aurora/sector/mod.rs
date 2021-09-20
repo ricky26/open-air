@@ -9,6 +9,7 @@ use crate::aurora::gdf::Statement;
 use crate::aurora::sector::visual::Geo;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
+use open_air::domain::coords::geo_to_map;
 
 mod io;
 mod visual;
@@ -125,8 +126,8 @@ impl SectorInfo {
         let include_dirs = statements.next()
             .map_or(Vec::new(), |s| s.parts().map(String::from).collect());
         Ok(SectorInfo {
-            center: (long, lat),
-            ratio: (horiz_ratio, vert_ratio),
+            center: (lat, long),
+            ratio: (vert_ratio, horiz_ratio),
             magnetic_variance,
             include_dirs,
         })
@@ -167,8 +168,13 @@ impl Sector {
         parse_latitude(name)
     }
 
-    pub fn lookup_position(&self, longitude: &str, latitude: &str) -> anyhow::Result<(f64, f64)> {
-        Ok((self.lookup_longitude(longitude)?, self.lookup_latitude(latitude)?))
+    pub fn lookup_geo_position(&self, latitude: &str, longitude: &str) -> anyhow::Result<(f64, f64)> {
+        Ok((self.lookup_latitude(latitude)?, self.lookup_longitude(longitude)?))
+    }
+
+    pub fn lookup_map_position(&self, latitude: &str, longitude: &str) -> anyhow::Result<(f64, f64)> {
+        let (latitude, longitude) = self.lookup_geo_position(latitude, longitude)?;
+        Ok(geo_to_map(latitude, longitude))
     }
 }
 
