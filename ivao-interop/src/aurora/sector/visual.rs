@@ -84,7 +84,7 @@ impl FillColor {
     }
 
     pub fn add_point(&mut self, statement: &Statement) -> anyhow::Result<bool> {
-        if statement.parts().count() == 2 {
+        if statement.parts().count() < 4 {
             let mut parts = statement.parts();
             let lat = parts.next()
                 .ok_or_else(|| anyhow!("missing latitude"))?

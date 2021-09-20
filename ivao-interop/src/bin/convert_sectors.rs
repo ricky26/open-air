@@ -18,8 +18,8 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let opts = Opts::parse();
-    let mut source = DirectorySource::new(opts.input.clone());
-    let mut builder = SectionBuilder::new(8);
+    let mut source = DirectorySource::new(opts.input.clone())?;
+    let mut builder = SectionBuilder::new(9);
 
     for path in opts.sector_files {
         let sector = Sector::parse(&mut source, &path)?;

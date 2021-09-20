@@ -2,6 +2,7 @@ import {createContext, useContext} from "react";
 
 export const DEG2RAD = Math.PI / 180;
 export const RAD2DEG = 180 / Math.PI;
+const MAX_SECTION_LEVEL = 8;
 const DEBUG_SECTIONS = false;
 
 const PALETTE = {
@@ -11,10 +12,41 @@ const PALETTE = {
   RESTRICT: '#4027bd',
   PROHIBIT: '#4027bd',
   TAXI_CENTER: '#0d0',
+  TAXIWAY: 'white',
   RUNWAY: '#7b6245',
   STOPBAR: 'white',
   STOPLINE: 'white',
   BUILDING: 'black',
+
+  // Extras
+  GRASS: 'green',
+  APRON: 'gray',
+  DYN_ACC_BKGND: 'transparent',
+  DYN_ACC_CONTOUR: 'transparent',
+  ILSDRAW: 'white',
+  APTMARK: 'red',
+  APPRON: 'gray',
+  RWYFILL: 'gray',
+  RWYEDGE: 'gray',
+  APRFILL: 'gray',
+  APREDGE: 'gray',
+  TAXI_CENTER_BLUE: 'blue',
+  ILSGATE: 'green',
+
+  YELLOW: 'yellow',
+  LIGHTGREY: 'lightgrey',
+  DARKGREY: 'darkgrey',
+  MIDDLEGREY: 'gray',
+  '<RADARBACK>': 'blue',
+
+  P_RUNWAY: 'gray',
+  P_RUNWAY_MARK: 'red',
+  P_RUNWAY_GRASS: 'green',
+  P_BUILDING: 'gray',
+  P_TAXIWAY: 'white',
+  P_APRON: 'gray',
+  P_RUNWAY_Y_MARK: 'gray',
+  P_GRASS_BG: 'green',
 };
 
 function hsv2rgb(h, s, v) {
@@ -245,7 +277,7 @@ export class MapService {
       return index;
     }
 
-    const dataLevel = Math.min(7, level);
+    const dataLevel = Math.min(MAX_SECTION_LEVEL, level);
     let dataX = x;
     let dataY = y;
     if (dataLevel !== level) {
@@ -253,7 +285,7 @@ export class MapService {
       dataY = y >> (level - dataLevel);
     }
 
-    const section = this.sectionSource.getSection(Math.min(7, level), dataX, dataY);
+    const section = this.sectionSource.getSection(dataLevel, dataX, dataY);
     if (section === null) {
       return null;
     }

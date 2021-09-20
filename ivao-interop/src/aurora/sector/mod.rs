@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::iter::FromIterator;
 
 use anyhow::anyhow;
+use relative_path::{RelativePath, RelativePathBuf};
 
 use airport::Airport;
 pub use io::{DirectorySource, FileSource};
@@ -9,9 +10,9 @@ use open_air::domain::coords::geo_to_map;
 use visual::Geo;
 
 use crate::aurora::gdf::Statement;
+use crate::aurora::sector::visual::FillColor;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
-use crate::aurora::sector::visual::FillColor;
 
 mod io;
 mod visual;
@@ -21,15 +22,17 @@ mod airport;
 const INCLUDE_PATH: &str = "Include";
 
 fn load_file_contents(fs: &mut impl FileSource, include_dirs: &[String], name: &str) -> anyhow::Result<Option<Vec<u8>>> {
-    let test_path = format!("{}/{}", INCLUDE_PATH, name);
+    let name = RelativePathBuf::from(name.replace('\\', "/"));
+    let name = name.normalize();
 
-    if let Some(contents) = fs.read_file(&test_path)? {
+    let test_path = RelativePath::new(INCLUDE_PATH).join(&name).normalize();
+    if let Some(contents) = fs.read_file(test_path.as_str())? {
         return Ok(Some(contents));
     }
 
     for dir in include_dirs.iter() {
-        let test_path = format!("{}/{}/{}", INCLUDE_PATH, dir, name);
-        if let Some(contents) = fs.read_file(&test_path)? {
+        let test_path = RelativePath::new(INCLUDE_PATH).join(dir).join(&name).normalize();
+        if let Some(contents) = fs.read_file(test_path.as_str())? {
             return Ok(Some(contents));
         }
     }
@@ -67,7 +70,7 @@ impl<'a, S: FileSource> SectionStatementIter<'a, S> {
     fn load_file(&mut self, name: Option<&str>) -> anyhow::Result<()> {
         let name = name.ok_or_else(|| anyhow!("missing filename"))?;
         let file = load_file(self.fs, &self.include_dirs, name)?
-            .ok_or_else(|| anyhow!("missing referenced file"))?;
+            .ok_or_else(|| anyhow!("missing referenced file: {}", name))?;
 
         if file.sections().len() != 1 {
             Err(anyhow!("unexpected sections in include: {}", name))?;
@@ -139,7 +142,9 @@ impl SectorInfo {
             .and_then(|s| Ok(s.as_str().parse()?))?;
 
         let include_dirs = statements.next()
-            .map_or(Vec::new(), |s| s.parts().map(String::from).collect());
+            .map_or(Vec::new(), |s| {
+                s.parts().map(|p| p.replace('\\', "/")).collect()
+            });
         Ok(SectorInfo {
             center: (lat, long),
             ratio: (vert_ratio, horiz_ratio),

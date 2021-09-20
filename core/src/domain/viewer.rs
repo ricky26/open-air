@@ -8,7 +8,7 @@ use crate::domain::{Airspace, Point};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Palette(pub HashMap<String, u32>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(untagged)]
 pub enum Colour {
     Reference(String),
@@ -128,6 +128,29 @@ impl SectionBuilder {
         self.levels
     }
 
+    pub fn truncate_f64(&self, level: i16, v: f64) -> f64 {
+        if level < self.levels() - 1 {
+            let scale = (1 << ((level as i64) + 9)) as f64;
+            (v * scale).round() / scale
+        } else {
+            v
+        }
+    }
+
+    pub fn truncate_2xf64(&self, level: i16, v: (f64, f64)) -> (f64, f64) {
+        (self.truncate_f64(level, v.0), self.truncate_f64(level, v.1))
+    }
+
+    pub fn include_aabb(&self, level: i16, aabb: (f64, f64, f64, f64)) -> bool {
+        if level >= self.levels() - 1 {
+            true
+        } else {
+            let min_size = 1. / ((1 << (level + 9)) as f64);
+            let (min_x, min_y, max_x, max_y) = aabb;
+            (max_x - min_x) >= min_size && (max_y - min_y) >= min_size
+        }
+    }
+
     pub fn global_mut(&mut self) -> &mut Global {
         &mut self.global
     }
@@ -169,4 +192,30 @@ impl SectionBuilder {
     pub fn build(self) -> (Global, Vec<Section>) {
         (self.global, self.sections.into_values().collect())
     }
+}
+
+pub fn normalise_aabb(src: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+    (src.0.min(src.2), src.1.min(src.3), src.0.max(src.2), src.1.max(src.3))
+}
+
+pub fn aabb_intersects(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
+    let a = normalise_aabb(a);
+    let b = normalise_aabb(b);
+
+    let aw = a.2 - a.0;
+    let ah = a.3 - a.1;
+    let acx = (a.0 + a.2) * 0.5;
+    let acy = (a.1 + a.3) * 0.5;
+
+    let bw = b.2 - b.0;
+    let bh = b.3 - b.1;
+    let bcx = (b.0 + b.2) * 0.5;
+    let bcy = (b.1 + b.3) * 0.5;
+
+    let dx = (acx - bcx).abs();
+    let dy = (acy - bcy).abs();
+    let width = 0.5 * (aw + bw);
+    let height = 0.5 * (ah + bh);
+
+    (dx < width) && (dy < height)
 }

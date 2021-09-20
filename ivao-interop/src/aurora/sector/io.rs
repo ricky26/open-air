@@ -1,30 +1,55 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use anyhow::anyhow;
+use relative_path::RelativePath;
+use walkdir::WalkDir;
+
 pub trait FileSource {
     fn read_file(&mut self, path: &str) -> anyhow::Result<Option<Vec<u8>>>;
 }
 
 #[derive(Debug, Clone)]
 pub struct DirectorySource {
-    base_path: PathBuf,
+    paths: HashMap<String, PathBuf>,
 }
 
 impl DirectorySource {
-    pub fn new(base_path: PathBuf) -> DirectorySource {
-        DirectorySource {
-            base_path,
+    pub fn new(base_path: PathBuf) -> anyhow::Result<DirectorySource> {
+        let base_path = base_path.canonicalize()?;
+        let mut paths = HashMap::new();
+
+        for entry in WalkDir::new(&base_path)
+            .follow_links(true)
+            .into_iter() {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+
+            let relative = pathdiff::diff_paths(entry.path(), &base_path)
+                .ok_or_else(|| anyhow!("somehow found a file not contained in the input path"))?;
+
+            let path = RelativePath::from_path(&relative)?;
+            let lower_path = path.as_str().to_lowercase();
+
+            paths.insert(lower_path, entry.path().to_owned());
         }
+
+        Ok(DirectorySource {
+            paths,
+        })
     }
 }
 
 impl FileSource for DirectorySource {
     fn read_file(&mut self, path: &str) -> anyhow::Result<Option<Vec<u8>>> {
-        let file_path = self.base_path.join(path);
-        match std::fs::read(file_path) {
-            Ok(v) => Ok(Some(v)),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(err) => Err(err.into()),
+        let path = path.to_lowercase();
+
+        if let Some(path) = self.paths.get(&path) {
+            Ok(Some(std::fs::read(path)?))
+        } else {
+            Ok(None)
         }
     }
 }
