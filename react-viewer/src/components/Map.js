@@ -62,6 +62,7 @@ export default function Map(props) {
       const worldW = maxX - minX;
       const worldH = maxY - minY;
 
+      mapService.quota = 1;
       mapService.draw(ctx, minX, minY, worldW, worldH, level);
 
       if (running) {

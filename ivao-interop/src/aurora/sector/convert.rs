@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use open_air::domain::viewer::{Colour, SectionBuilder, Shape, aabb_intersects};
+use anyhow::anyhow;
+
+use open_air::domain::viewer::{aabb_intersects, Colour, Label, SectionBuilder, Shape};
 
 use crate::aurora::sector::Sector;
 
@@ -179,6 +181,15 @@ fn simplify_shape(builder: &SectionBuilder, shape: &mut Shape, level: i16) {
 
 impl Sector {
     pub fn convert(&self, builder: &mut SectionBuilder) -> anyhow::Result<()> {
+        for (name, colour) in self.defines.iter() {
+            let value = match colour {
+                Colour::Value(value) => *value,
+                Colour::Reference(_) =>
+                    return Err(anyhow!("defines must not reference other palette entries")),
+            };
+            builder.global_mut().palette.0.insert(name.clone(), value);
+        }
+
         for fill in self.fill_colors.iter() {
             for level in 0..builder.levels() {
                 let mut shape = Shape {
@@ -316,6 +327,26 @@ impl Sector {
                 });
             }
         }
+
+        for airport in self.airports.iter() {
+            let map_position = self.lookup_map_position(
+                &airport.geo_position.0, &airport.geo_position.1)?;
+            let map_aabb = (map_position.0, map_position.1, map_position.0, map_position.1);
+            let label = Label {
+                text: airport.identifier.clone(),
+                font_size: 8.,
+                map_position,
+                filter: Default::default(),
+                map_aabb,
+            };
+
+            for level in 0..builder.levels() {
+                builder.apply_by_aabb(level, map_aabb, |section| {
+                    section.labels.push(label.clone());
+                });
+            }
+        }
+
         Ok(())
     }
 }

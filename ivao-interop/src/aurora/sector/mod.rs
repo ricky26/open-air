@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::iter::FromIterator;
 
 use anyhow::anyhow;
@@ -7,9 +7,10 @@ use relative_path::{RelativePath, RelativePathBuf};
 use airport::Airport;
 pub use io::{DirectorySource, FileSource};
 use open_air::domain::coords::geo_to_map;
+use open_air::domain::viewer::Colour;
 use visual::Geo;
 
-use crate::aurora::gdf::Statement;
+use crate::aurora::gdf::{parse_colour, Statement};
 use crate::aurora::sector::visual::FillColor;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
@@ -156,6 +157,7 @@ impl SectorInfo {
 
 pub struct Sector {
     pub info: SectorInfo,
+    pub defines: HashMap<String, Colour>,
     pub airports: Vec<Airport>,
     pub geo: Vec<Geo>,
     pub fill_colors: Vec<FillColor>,
@@ -168,6 +170,19 @@ impl Sector {
 
         let info = root_file.section("INFO").ok_or(anyhow!("missing INFO section"))?;
         let info = SectorInfo::from_section(info)?;
+
+        let mut defines = HashMap::new();
+        for statement in SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("DEFINE")) {
+            let statement = statement?;
+            let mut parts = statement.parts();
+            let name = parts.next()
+                .ok_or_else(|| anyhow!("missing define name"))?
+                .to_owned();
+            let fill_color = parse_colour(parts.next()
+                .ok_or_else(|| anyhow!("missing colour"))?)?;
+            defines.insert(name, fill_color);
+        }
 
         let airports = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("AIRPORT"))
@@ -197,6 +212,7 @@ impl Sector {
 
         Ok(Sector {
             info,
+            defines,
             airports,
             geo,
             fill_colors,

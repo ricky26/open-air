@@ -1,4 +1,5 @@
 import {createContext, useContext} from "react";
+import {Cache} from "./cache";
 
 export const DEG2RAD = Math.PI / 180;
 export const RAD2DEG = 180 / Math.PI;
@@ -112,6 +113,14 @@ function aabbIntersects(a, b) {
   return (distX < width) && (distY < height);
 }
 
+function createCanvas({width, height}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  return {canvas, context};
+}
+
 export class SectionSource {
   constructor() {
     this.entries = {};
@@ -163,118 +172,23 @@ export class SectionSource {
   }
 }
 
-export class TileCache {
-  constructor(size, count) {
-    this.size = size;
-    this.rows = Math.ceil(Math.log2(count));
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = size * this.rows;
-    this.canvas.height = size * this.rows;
-    this.context = this.canvas.getContext("2d");
-    this.sequence = 0;
-    this.entries = {};
-    this.free = [];
-
-    for (let i = 0; i < this.rows * this.rows; ++i) {
-      this.free.push(i);
-    }
-  }
-
-  use(key) {
-    if (!Object.prototype.hasOwnProperty.call(this.entries, key)) {
-      return null;
-    }
-
-    const existing = this.entries[key];
-    existing.accessed = this.sequence++;
-    return existing.index;
-  }
-
-  allocateIndex(key) {
-    if (Object.prototype.hasOwnProperty.call(this.entries, key)) {
-      return this.entries[key].index;
-    }
-
-    if (this.free.length > 0) {
-      const index = this.free.shift();
-      this.entries[key] = {
-        index,
-        accessed: this.sequence++,
-      };
-      return index;
-    }
-
-    let bestKey = null;
-    let bestValue = null;
-
-    for (const key of Object.keys(this.entries)) {
-      const existing = this.entries[key];
-      if ((bestKey !== null) && (existing.accessed >= bestValue)) {
-        continue;
-      }
-
-      bestKey = key;
-      bestValue = existing.accessed;
-    }
-
-    if (bestKey === null) {
-      return null;
-    }
-
-    const index = this.entries[bestKey].index;
-    delete this.entries[bestKey];
-    this.entries[key] = {
-      index,
-      accessed: this.sequence++,
-      allocated: new Date(),
-    };
-    return index;
-  }
-
-  allocate(key) {
-    const index = this.allocateIndex(key);
-    if (index === null) {
-      return null;
-    }
-
-    const x = (index % this.rows) * this.size;
-    const y = Math.floor(index / this.rows) * this.size;
-    this.context.save();
-    this.context.setTransform(this.size, 0, 0, this.size, x, y);
-    this.context.beginPath();
-    this.context.rect(0, 0, 1, 1);
-    this.context.clip();
-    this.context.clearRect(0, 0, 1, 1);
-    return index;
-  }
-
-  allocatedAt(key) {
-    const entry = this.entries[key];
-    return (entry === undefined) ? null : entry.allocated;
-  }
-
-  draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh, idx) {
-    const ox = (idx % this.rows) * this.size;
-    const oy = Math.floor(idx / this.rows) * this.size;
-    ctx.drawImage(this.canvas, ox + sx, oy + sy, sw, sh, dx, dy, dw, dh);
-  }
-}
-
 export class MapService {
   constructor() {
     this.sectionSource = new SectionSource();
-    this.tileCache = new TileCache(1024, 16);
+    this.tileCache = new Cache();
+    this.tileSize = 512;
+    this.quota = 0;
   }
 
-  get tileSize() {
-    return this.tileCache.size;
-  }
-
-  renderTile(level, x, y) {
-    const key = `${level},${x},${y}`;
+  renderShapes(level, x, y) {
+    const key = `shapes_${level}_${x}_${y}`;
     let index = this.tileCache.use(key);
     if (index !== null) {
       return index;
+    }
+
+    if (this.quota <= 0) {
+      return null;
     }
 
     const dataLevel = Math.min(MAX_SECTION_LEVEL, level);
@@ -290,87 +204,92 @@ export class MapService {
       return null;
     }
 
-    index = this.tileCache.allocate(key);
-    if (index === null) {
-      return null;
-    }
+    this.quota--;
+    return this.tileCache.allocate(key, () => {
+      const {canvas, context: ctx} = createCanvas({
+        width: this.tileSize,
+        height: this.tileSize,
+      });
+      const divisions = 1 << level;
+      const scale = 1 / divisions;
+      const minX = x * scale;
+      const minY = y * scale;
+      const maxX = minX + scale;
+      const maxY = minY + scale;
+      const sectionAabb = [minX, minY, maxX, maxY];
+      ctx.setTransform(this.tileSize, 0, 0, this.tileSize, 0, 0);
 
-    const ctx = this.tileCache.context;
-    const divisions = 1 << level;
-    const scale = 1 / divisions;
-    const minX = x * scale;
-    const minY = y * scale;
-    const maxX = minX + scale;
-    const maxY = minY + scale;
-    const sectionAabb = [minX, minY, maxX, maxY];
-
-    if (DEBUG_SECTIONS) {
-      ctx.beginPath();
-      ctx.rect(0, 0, 1, 1);
-      ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 0.05));
-      ctx.fill();
-    }
-
-    for (const shape of section.shapes) {
-      const strokeStyle = parseStyle(shape.strokeColour);
-      const fillStyle = parseStyle(shape.fillColour);
-
-      if (!aabbIntersects(sectionAabb, shape.mapAabb)) {
-        continue;
+      if (DEBUG_SECTIONS) {
+        ctx.beginPath();
+        ctx.rect(0, 0, 1, 1);
+        ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 0.05));
+        ctx.fill();
       }
 
-      if (!strokeStyle && !fillStyle) {
-        console.log('no style', shape.fillColour, shape.strokeColour);
-        continue;
-      }
+      for (const shape of section.shapes) {
+        const strokeStyle = parseStyle(shape.strokeColour);
+        const fillStyle = parseStyle(shape.fillColour);
 
-      let first = true;
-      ctx.beginPath();
-      for (const [px, py] of shape.mapPoints) {
-        const tx = (px - minX) * divisions;
-        const ty = (py - minY) * divisions;
+        if (!aabbIntersects(sectionAabb, shape.mapAabb)) {
+          continue;
+        }
 
-        if (first) {
-          ctx.moveTo(tx, ty);
-          first = false;
-        } else {
-          ctx.lineTo(tx, ty);
+        if (!strokeStyle && !fillStyle) {
+          console.log('no style', shape.fillColour, shape.strokeColour);
+          continue;
+        }
+
+        let first = true;
+        ctx.beginPath();
+        for (const [px, py] of shape.mapPoints) {
+          const tx = (px - minX) * divisions;
+          const ty = (py - minY) * divisions;
+
+          if (first) {
+            ctx.moveTo(tx, ty);
+            first = false;
+          } else {
+            ctx.lineTo(tx, ty);
+          }
+        }
+
+        if (strokeStyle) {
+          ctx.strokeStyle = strokeStyle;
+          ctx.lineWidth = shape.strokeWidth / this.tileSize;
+          ctx.stroke();
+        }
+
+        if (fillStyle) {
+          ctx.closePath();
+          ctx.fillStyle = fillStyle;
+          ctx.fill();
         }
       }
 
-      if (strokeStyle) {
-        ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = shape.strokeWidth / this.tileSize;
-        ctx.stroke();
-      }
-
-      if (fillStyle) {
-        ctx.closePath();
-        ctx.fillStyle = fillStyle;
-        ctx.fill();
-      }
-    }
-
-    ctx.restore();
-    return index;
+      ctx.restore();
+      return canvas;
+    }, canvas => {
+      canvas.width = 0;
+      canvas.height = 0;
+    });
   }
 
-  drawTile(ctx, level, x, y, dx, dy, dw, dh) {
-    let index = this.renderTile(level, x, y);
+  drawShapes(ctx, level, x, y, dx, dy, dw, dh) {
+    let entry = this.renderShapes(level, x, y);
     let drawLevel = level;
 
-    while ((index === null) && (drawLevel > 0)) {
+    while ((entry === null) && (drawLevel > 0)) {
       // It's not ready yet, check lower levels.
       drawLevel--;
 
       const dx = x >> (level - drawLevel);
       const dy = y >> (level - drawLevel);
 
-      const key = `${drawLevel},${dx},${dy}`;
-      index = this.tileCache.use(key);
+      const key = `shapes_${drawLevel}_${dx}_${dy}`;
+      entry = this.tileCache.use(key);
     }
 
-    if (index === null) {
+    if (entry === null) {
       return;
     }
 
@@ -387,7 +306,7 @@ export class MapService {
       sh >>= deltaLevel;
     }
 
-    this.tileCache.draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh, index);
+    ctx.drawImage(entry.value, sx, sy, sw, sh, dx, dy, dw, dh);
   }
 
   tileRange(x, y, w, h, level) {
@@ -405,7 +324,7 @@ export class MapService {
 
     for (let x = minX; x < maxX; ++x) {
       for (let y = minY; y < maxY; ++y) {
-        this.renderTile(level, x, y);
+        this.renderShapes(level, x, y);
       }
     }
   }
@@ -419,17 +338,20 @@ export class MapService {
       this.preload(x, y, w, h, level - 1);
     }
 
-    const [minX, minY, maxX, maxY,, scale] = this.tileRange(x, y, w, h, level);
+    const [minX, minY, maxX, maxY, , scale] = this.tileRange(x, y, w, h, level);
     for (let x = minX; x < maxX; ++x) {
       for (let y = minY; y < maxY; ++y) {
-        this.drawTile(ctx, level, x, y, x * scale, y * scale, scale, scale);
+        this.drawShapes(ctx, level, x, y, x * scale, y * scale, scale, scale);
       }
     }
   }
 }
 
-MapService.Context = createContext(new MapService());
+MapService
+  .Context = createContext(new MapService());
 
-export function useMap() {
+export function
+
+useMap() {
   return useContext(MapService.Context);
 }
