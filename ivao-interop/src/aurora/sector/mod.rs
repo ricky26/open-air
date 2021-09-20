@@ -2,6 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::iter::FromIterator;
 
 use anyhow::anyhow;
+use log::warn;
 use relative_path::{RelativePath, RelativePathBuf};
 
 use airport::Airport;
@@ -11,14 +12,18 @@ use open_air::domain::viewer::Colour;
 use visual::Geo;
 
 use crate::aurora::gdf::{parse_colour, Statement};
+use crate::aurora::sector::airport::{Gate, Runway, Taxiway};
+use crate::aurora::sector::fixes::Fix;
 use crate::aurora::sector::visual::FillColor;
 
 use super::gdf::{File, parse_latitude, parse_longitude, Section};
 
 mod io;
+mod parsing;
 mod visual;
 mod convert;
 mod airport;
+mod fixes;
 
 const INCLUDE_PATH: &str = "Include";
 
@@ -47,6 +52,16 @@ fn load_file(fs: &mut impl FileSource, include_dirs: &[String], name: &str) -> a
         .transpose()?
         .map(|s| File::parse(&s))
         .transpose()?)
+}
+
+fn warn_filter<T>(result: anyhow::Result<T>) -> Option<T> {
+    match result {
+        Ok(v) => Some(v),
+        Err(err) => {
+            warn!("badly formatted input: {}", err);
+            None
+        }
+    }
 }
 
 struct SectionStatementIter<'a, S> {
@@ -155,10 +170,18 @@ impl SectorInfo {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Sector {
     pub info: SectorInfo,
-    pub defines: HashMap<String, Colour>,
+
     pub airports: Vec<Airport>,
+    pub runways: Vec<Runway>,
+    pub taxiways: Vec<Taxiway>,
+    pub gates: Vec<Gate>,
+
+    pub fixes: Vec<Fix>,
+
+    pub defines: HashMap<String, Colour>,
     pub geo: Vec<Geo>,
     pub fill_colors: Vec<FillColor>,
 }
@@ -186,13 +209,45 @@ impl Sector {
 
         let airports = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("AIRPORT"))
-            .map(|s| Airport::parse(&(s?)))
-            .collect::<Result<Vec<Airport>, _>>()?;
+            .filter_map(warn_filter)
+            .map(|s| Airport::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let runways = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("RUNWAY"))
+            .filter_map(warn_filter)
+            .map(|s| Runway::parse(&s))
+            .filter_map(warn_filter)
+            .collect();
+
+        let mut taxiways = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("TAXIWAY"))
+            .filter_map(warn_filter)
+            .map(|s| Taxiway::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let mut gates = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("GATES"))
+            .filter_map(warn_filter)
+            .map(|s| Gate::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let fixes = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("FIXES"))
+            .filter_map(warn_filter)
+            .map(|s| Fix::parse(&s))
+            .filter_map(warn_filter)
+            .collect();
 
         let geo = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("GEO"))
-            .map(|s| Geo::parse(&(s?)))
-            .collect::<Result<Vec<Geo>, _>>()?;
+            .filter_map(warn_filter)
+            .map(|s| Geo::parse(&s))
+            .filter_map(warn_filter)
+            .collect();
 
         let mut fill_colors = Vec::new();
         FillColor::from_iterator(
@@ -208,12 +263,41 @@ impl Sector {
                         section.statements().iter().cloned().map(Ok))?;
                 }
             }
+
+            if let Some(file) = load_file(
+                fs, &info.include_dirs, &format!("{}.txi", &airport.identifier))? {
+                if let Some(section) = file.section("") {
+                    for statement in section.statements().iter() {
+                        if let Some(taxiway) = warn_filter(Taxiway::parse(statement)) {
+                            taxiways.push(taxiway);
+                        }
+                    }
+                }
+            }
+
+            if let Some(file) = load_file(
+                fs, &info.include_dirs, &format!("{}.gts", &airport.identifier))? {
+                if let Some(section) = file.section("") {
+                    for statement in section.statements().iter() {
+                        if let Some(gate) = warn_filter(Gate::parse(statement)) {
+                            gates.push(gate);
+                        }
+                    }
+                }
+            }
         }
 
         Ok(Sector {
             info,
-            defines,
+
             airports,
+            runways,
+            taxiways,
+            gates,
+
+            fixes,
+
+            defines,
             geo,
             fill_colors,
         })

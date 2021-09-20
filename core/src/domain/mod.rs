@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub mod viewer;
 pub mod coords;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FixKind {
     Enroute,
@@ -57,7 +57,9 @@ pub struct Airport {
 pub struct Runway {
     pub primary_id: String,
     pub opposite_id: String,
-    pub points: [(f64, f64, f64); 2],
+    pub primary_course: f32,
+    pub opposite_course: f32,
+    pub points: [(f64, f64, f32); 2],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

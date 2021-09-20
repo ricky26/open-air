@@ -367,6 +367,49 @@ export class MapService {
       const h = canvas.height / pixelScale;
       ctx.drawImage(canvas, x - w * 0.5, y - h * 0.5, w, h);
     }
+
+    for (const point of section.points) {
+      const fontSize = 6 * TEXT_SCALE * (1.1 ** level);
+      if (fontSize < 8) {
+        continue;
+      }
+
+      const key = `point_${level}_${point.name}`;
+      const entry = this.tileCache.allocate(key, () => {
+        const {canvas, context} = createCanvas();
+        const font = `${fontSize}pt ${FONT_FAMILY}`;
+
+        // Calculate text size.
+        context.font = font;
+        context.textAlign = 'left';
+        context.textBaseline = 'top';
+        const {width, actualBoundingBoxDescent: height} = context.measureText(point.name);
+        canvas.width = width + 12;
+        canvas.height = height + 12;
+
+        // Render text
+        context.font = font;
+        context.textAlign = 'left';
+        context.textBaseline = 'top';
+        context.fillStyle = 'pink';
+        context.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        context.shadowBlur = 4;
+        context.fillText(point.name, 6, 6);
+
+        return {canvas};
+      }, freeCanvas);
+      if (entry === null) {
+        continue;
+      }
+
+      const x = dx + (point.position[0] - worldMinX) / scale * dw;
+      const y = dy + (point.position[1] - worldMinY) / scale * dh;
+      const {canvas} = entry.value;
+      const w = canvas.width / pixelScale;
+      const h = canvas.height / pixelScale;
+      ctx.drawImage(canvas, x - w * 0.5, y - h * 0.5, w, h);
+
+    }
   }
 
   tileRange(x, y, w, h, level) {

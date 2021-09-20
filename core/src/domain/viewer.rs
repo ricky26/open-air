@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{Airspace, Point};
+use crate::domain::{Airport, Airspace, Airway, Point, Runway};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Palette(pub HashMap<String, u32>);
@@ -106,7 +106,10 @@ pub struct Section {
     pub shapes: Vec<Shape>,
 
     pub points: Vec<Point>,
+    pub airports: Vec<Airport>,
+    pub runways: Vec<Runway>,
     pub airspaces: Vec<Airspace>,
+    pub airways: Vec<Airway>,
 }
 
 pub struct SectionBuilder {

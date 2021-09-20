@@ -4,7 +4,9 @@ use log::warn;
 use open_air::domain::viewer::Colour;
 
 use crate::aurora::gdf::{parse_colour, Statement};
+use crate::aurora::sector::parsing::parse_string_position;
 
+#[derive(Debug, Clone)]
 pub struct Geo {
     pub start: (String, String),
     pub end: (String, String),
@@ -15,19 +17,8 @@ impl Geo {
     pub fn parse(statement: &Statement) -> anyhow::Result<Geo> {
         let mut parts = statement.parts();
 
-        let start_lat = parts.next()
-            .ok_or_else(|| anyhow!("missing latitude"))?
-            .to_owned();
-        let start_long = parts.next()
-            .ok_or_else(|| anyhow!("missing longitude"))?
-            .to_owned();
-        let end_lat = parts.next()
-            .ok_or_else(|| anyhow!("missing latitude"))?
-            .to_owned();
-        let end_long = parts.next()
-            .ok_or_else(|| anyhow!("missing longitude"))?
-            .to_owned();
-
+        let start = parse_string_position(&mut parts)?;
+        let end = parse_string_position(&mut parts)?;
         let color = parts.next()
             .map(parse_colour)
             .transpose()?;
@@ -37,13 +28,14 @@ impl Geo {
         }
 
         Ok(Geo {
-            start: (start_lat, start_long),
-            end: (end_lat, end_long),
+            start,
+            end,
             color,
         })
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FillColor {
     pub poly_type: String,
     pub fill_color: Colour,

@@ -3,8 +3,9 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use anyhow::anyhow;
+use log::warn;
 
-use open_air::domain::viewer::{aabb_intersects, Colour, Label, SectionBuilder, Shape};
+use open_air::domain::viewer::{aabb_intersects, Colour, Label, normalise_aabb, SectionBuilder, Shape};
 
 use crate::aurora::sector::Sector;
 
@@ -343,6 +344,61 @@ impl Sector {
             for level in 0..builder.levels() {
                 builder.apply_by_aabb(level, map_aabb, |section| {
                     section.labels.push(label.clone());
+                });
+            }
+        }
+
+        for runway in self.runways.iter() {
+            let domain = runway.to_domain(self)?;
+            let aabb = normalise_aabb((
+                domain.points[0].0,
+                domain.points[0].1,
+                domain.points[1].0,
+                domain.points[1].1,
+            ));
+
+            for level in 0..builder.levels() {
+                builder.apply_by_aabb(level, aabb, |section| {
+                    section.runways.push(domain.clone());
+                });
+            }
+        }
+
+        for gate in self.gates.iter() {
+            let domain = gate.to_label(self)?;
+            for level in 7..builder.levels() {
+                builder.apply_by_aabb(level, domain.map_aabb, |section| {
+                    section.labels.push(domain.clone());
+                });
+            }
+        }
+
+        for taxiway in self.taxiways.iter() {
+            let domain = taxiway.to_label(self)?;
+            for level in 6..builder.levels() {
+                builder.apply_by_aabb(level, domain.map_aabb, |section| {
+                    section.labels.push(domain.clone());
+                });
+            }
+        }
+
+        for fix in self.fixes.iter() {
+            let domain = match fix.to_domain(self) {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!("error converting fix {:?}: {}", fix, err);
+                    continue;
+                }
+            };
+            let aabb = (
+                domain.position.0,
+                domain.position.1,
+                domain.position.0,
+                domain.position.1,
+            );
+            for level in 3..builder.levels() {
+                builder.apply_by_aabb(level, aabb, |section| {
+                    section.points.push(domain.clone());
                 });
             }
         }
