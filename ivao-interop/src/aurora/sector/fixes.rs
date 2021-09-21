@@ -6,7 +6,7 @@ use open_air::domain;
 use open_air::domain::PointKind;
 
 use crate::aurora::gdf::Statement;
-use crate::aurora::sector::parsing::{parse_string_position, frequency_to_int};
+use crate::aurora::sector::parsing::{frequency_to_int, parse_string_position};
 use crate::aurora::sector::Sector;
 
 #[derive(Debug, Clone, Copy)]
@@ -161,6 +161,63 @@ impl VOR {
         Ok(domain::Point {
             kind: PointKind::VOR {
                 frequency: frequency_to_int(&self.frequency)?,
+            },
+            name: self.identifier.clone(),
+            position,
+        })
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct VRP {
+    pub identifier: String,
+    pub altitude: Option<(f32, f32)>,
+    pub geo_position: (String, String),
+}
+
+impl VRP {
+    fn parse_range(src: &str) -> anyhow::Result<(f32, f32)> {
+        let range = if let Some(position) = src.find('-') {
+            let min_str = &src[..position];
+            let max_str = &src[position + 1..];
+            let min = min_str.trim().parse::<f32>()?;
+            let max = max_str.trim().parse::<f32>()?;
+            (min, max)
+        } else {
+            let v = src.parse::<f32>()?;
+            (v, v)
+        };
+        Ok(range)
+    }
+
+    pub fn parse(statement: &Statement) -> anyhow::Result<VRP> {
+        let mut parts = statement.parts();
+
+        let identifier = parts.next()
+            .ok_or_else(|| anyhow!("missing VRP identifier"))?
+            .to_owned();
+        let altitude = parts.next()
+            .filter(|s| !s.is_empty())
+            .map(|part| VRP::parse_range(part))
+            .transpose()
+            .map_err(|e| anyhow!("failed to parse VRP range {}: {}", statement.as_str(), e))?;
+        let geo_position = parse_string_position(&mut parts)?;
+
+        Ok(VRP {
+            identifier,
+            altitude,
+            geo_position,
+        })
+    }
+
+    pub fn to_domain(&self, sector: &Sector) -> anyhow::Result<domain::Point> {
+        let position = sector.lookup_map_position(
+            &self.geo_position.0,
+            &self.geo_position.1)?;
+        Ok(domain::Point {
+            kind: PointKind::VRP {
+                altitude: self.altitude,
             },
             name: self.identifier.clone(),
             position,

@@ -12,12 +12,11 @@ use open_air::domain::viewer::Colour;
 use visual::Geo;
 
 use crate::aurora::gdf::{parse_colour, Statement};
+use crate::aurora::gdf::{File, parse_latitude, parse_longitude, Section};
 use crate::aurora::sector::airport::{Gate, Runway, Taxiway};
-use crate::aurora::sector::airspace::Airspace;
-use crate::aurora::sector::fixes::{Fix, NDB, VOR};
+use crate::aurora::sector::airspace::{Airspace, Airway};
+use crate::aurora::sector::fixes::{Fix, NDB, VOR, VRP};
 use crate::aurora::sector::visual::FillColor;
-
-use super::gdf::{File, parse_latitude, parse_longitude, Section};
 
 mod io;
 mod parsing;
@@ -184,14 +183,20 @@ pub struct Sector {
     pub fixes: Vec<Fix>,
     pub ndbs: Vec<NDB>,
     pub vors: Vec<VOR>,
+    pub vrps: Vec<VRP>,
 
     pub airspaces: Vec<Airspace>,
     pub airspaces_low: Vec<Airspace>,
     pub airspaces_high: Vec<Airspace>,
 
+    pub airways_low: Vec<Airway>,
+    pub airways_high: Vec<Airway>,
+
     pub defines: HashMap<String, Colour>,
     pub geo: Vec<Geo>,
     pub fill_colors: Vec<FillColor>,
+
+    pub fix_lookup: HashMap<String, (f64, f64)>,
 }
 
 impl Sector {
@@ -201,6 +206,53 @@ impl Sector {
 
         let info = root_file.section("INFO").ok_or(anyhow!("missing INFO section"))?;
         let info = SectorInfo::from_section(info)?;
+
+        let fixes = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("FIXES"))
+            .filter_map(warn_filter)
+            .map(|s| Fix::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let ndbs = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("NDB"))
+            .filter_map(warn_filter)
+            .map(|s| NDB::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let vors = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("VOR"))
+            .filter_map(warn_filter)
+            .map(|s| VOR::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let mut vrps = SectionStatementIter::from_section(
+            fs, &info.include_dirs, root_file.section("VFRFIX"))
+            .filter_map(warn_filter)
+            .map(|s| VRP::parse(&s))
+            .filter_map(warn_filter)
+            .collect::<Vec<_>>();
+
+        let mut fix_lookup = HashMap::new();
+        let all_fixes = fixes.iter().map(|f| (&f.identifier, &f.geo_position))
+            .chain(ndbs.iter().map(|f| (&f.identifier, &f.geo_position)))
+            .chain(vors.iter().map(|f| (&f.identifier, &f.geo_position)))
+            .chain(vrps.iter().map(|f| (&f.identifier, &f.geo_position)));
+
+        for (name, (lat, long)) in all_fixes {
+            let parsed = parse_latitude(lat).and_then(|v| Ok((v, parse_longitude(long)?)));
+            let (lat, long) = match parsed {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!("failed to parse fix {}: {}", name, e);
+                    continue;
+                }
+            };
+
+            fix_lookup.insert(name.to_string(), (lat, long));
+        }
 
         let mut defines = HashMap::new();
         for statement in SectionStatementIter::from_section(
@@ -243,30 +295,9 @@ impl Sector {
             .filter_map(warn_filter)
             .collect::<Vec<_>>();
 
-        let fixes = SectionStatementIter::from_section(
-            fs, &info.include_dirs, root_file.section("FIXES"))
-            .filter_map(warn_filter)
-            .map(|s| Fix::parse(&s))
-            .filter_map(warn_filter)
-            .collect();
-
-        let ndbs = SectionStatementIter::from_section(
-            fs, &info.include_dirs, root_file.section("NDB"))
-            .filter_map(warn_filter)
-            .map(|s| NDB::parse(&s))
-            .filter_map(warn_filter)
-            .collect();
-
-        let vors = SectionStatementIter::from_section(
-            fs, &info.include_dirs, root_file.section("VOR"))
-            .filter_map(warn_filter)
-            .map(|s| VOR::parse(&s))
-            .filter_map(warn_filter)
-            .collect();
-
         let mut airspaces = Vec::new();
-        let mut airspaces_low = Vec::new();
         let mut airspaces_high = Vec::new();
+        let mut airspaces_low = Vec::new();
 
         Airspace::from_iterator(
             &mut airspaces,
@@ -295,6 +326,18 @@ impl Sector {
             SectionStatementIter::from_section(
                 fs, &info.include_dirs, root_file.section("ARTCC_HIGH")))?;
 
+        let mut airways_high = Vec::new();
+        let mut airways_low = Vec::new();
+
+        Airway::from_iterator(
+            &mut airways_high,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("HIGH AIRWAY")))?;
+        Airway::from_iterator(
+            &mut airways_low,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("LOW AIRWAY")))?;
+
         let geo = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("GEO"))
             .filter_map(warn_filter)
@@ -307,36 +350,36 @@ impl Sector {
             &mut fill_colors,
             SectionStatementIter::from_section(fs, &info.include_dirs, root_file.section("FILLCOLOR")))?;
 
+        let load_airport_include = |fs: &mut _, airport: &Airport, name: &str|
+                                    -> anyhow::Result<_> {
+            Ok(load_file(
+                fs, &info.include_dirs, &format!("{}.{}", &airport.identifier, name))?
+                .and_then(|mut f| f.take_section("")))
+        };
+
         for airport in airports.iter() {
-            let fill_color_name = format!("{}.tfl", &airport.identifier);
-            if let Some(file) = load_file(fs, &info.include_dirs, &fill_color_name)? {
-                if let Some(section) = file.section("") {
-                    FillColor::from_iterator(
-                        &mut fill_colors,
-                        section.statements().iter().cloned().map(Ok))?;
-                }
+            if let Some(section) = load_airport_include(fs, airport, "vfi")? {
+                vrps.extend(section.statements().iter()
+                    .map(|s| VRP::parse(&s))
+                    .filter_map(warn_filter));
             }
 
-            if let Some(file) = load_file(
-                fs, &info.include_dirs, &format!("{}.txi", &airport.identifier))? {
-                if let Some(section) = file.section("") {
-                    for statement in section.statements().iter() {
-                        if let Some(taxiway) = warn_filter(Taxiway::parse(statement)) {
-                            taxiways.push(taxiway);
-                        }
-                    }
-                }
+            if let Some(section) = load_airport_include(fs, airport, "tfl")? {
+                FillColor::from_iterator(
+                    &mut fill_colors,
+                    section.statements().iter().cloned().map(Ok))?;
             }
 
-            if let Some(file) = load_file(
-                fs, &info.include_dirs, &format!("{}.gts", &airport.identifier))? {
-                if let Some(section) = file.section("") {
-                    for statement in section.statements().iter() {
-                        if let Some(gate) = warn_filter(Gate::parse(statement)) {
-                            gates.push(gate);
-                        }
-                    }
-                }
+            if let Some(section) = load_airport_include(fs, airport, "txi")? {
+                taxiways.extend(section.statements().iter()
+                    .map(|s| Taxiway::parse(s))
+                    .filter_map(warn_filter));
+            }
+
+            if let Some(section) = load_airport_include(fs, airport, "gts")? {
+                gates.extend(section.statements().iter()
+                    .map(|s| Gate::parse(s))
+                    .filter_map(warn_filter));
             }
         }
 
@@ -351,23 +394,37 @@ impl Sector {
             fixes,
             ndbs,
             vors,
+            vrps,
 
             airspaces,
             airspaces_high,
             airspaces_low,
 
+            airways_high,
+            airways_low,
+
             defines,
             geo,
             fill_colors,
+
+            fix_lookup,
         })
     }
 
     fn lookup_longitude(&self, name: &str) -> anyhow::Result<f64> {
-        parse_longitude(name)
+        if let Some((_, value)) = self.fix_lookup.get(name) {
+            Ok(*value)
+        } else {
+            parse_longitude(name)
+        }
     }
 
     fn lookup_latitude(&self, name: &str) -> anyhow::Result<f64> {
-        parse_latitude(name)
+        if let Some((value, _)) = self.fix_lookup.get(name) {
+            Ok(*value)
+        } else {
+            parse_latitude(name)
+        }
     }
 
     pub fn lookup_geo_position(&self, latitude: &str, longitude: &str) -> anyhow::Result<(f64, f64)> {

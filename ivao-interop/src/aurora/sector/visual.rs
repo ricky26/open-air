@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use log::warn;
 
 use open_air::domain::viewer::Colour;
 
@@ -22,10 +21,6 @@ impl Geo {
         let color = parts.next()
             .map(parse_colour)
             .transpose()?;
-
-        if let Some(value) = parts.next() {
-            warn!("unexpected data at end of statement: {}", value);
-        }
 
         Ok(Geo {
             start,

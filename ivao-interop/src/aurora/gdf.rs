@@ -75,6 +75,10 @@ impl File {
         self.sections.get_mut(key).unwrap()
     }
 
+    pub fn take_section(&mut self, name: &str) -> Option<Section> {
+        self.sections.remove(name)
+    }
+
     /// Parse a sector file from a string.
     pub fn parse(src: &str) -> anyhow::Result<File> {
         let mut sections = HashMap::new();

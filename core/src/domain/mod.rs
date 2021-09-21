@@ -20,6 +20,7 @@ pub enum PointKind {
     FIX { kind: FixKind, is_boundary: bool },
     VOR { frequency: u16 },
     NDB { frequency: u16 },
+    VRP { altitude: Option<(f32, f32)> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +70,12 @@ pub enum AirwayKind {
     High,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirwayLabel {
+    pub map_position: (f64, f64),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Airway {
@@ -76,6 +83,7 @@ pub struct Airway {
     pub name: String,
     pub points: Vec<(f64, f64)>,
     pub aabb: (f64, f64, f64, f64),
+    pub labels: Vec<AirwayLabel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

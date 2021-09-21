@@ -5,10 +5,10 @@ use std::hash::{Hash, Hasher};
 use anyhow::anyhow;
 use log::warn;
 
+use open_air::domain::{AirspaceLayer, AirwayKind};
 use open_air::domain::viewer::{aabb_intersects, Colour, Label, normalise_aabb, SectionBuilder, Shape};
 
 use crate::aurora::sector::Sector;
-use open_air::domain::AirspaceLayer;
 
 struct PartialPolygon {
     shape: Shape,
@@ -389,7 +389,8 @@ impl Sector {
 
         let fixes = self.fixes.iter().map(|s| (&s.identifier, s.to_domain(self)))
             .chain(self.ndbs.iter().map(|s| (&s.identifier, s.to_domain(self))))
-            .chain(self.vors.iter().map(|s| (&s.identifier, s.to_domain(self))));
+            .chain(self.vors.iter().map(|s| (&s.identifier, s.to_domain(self))))
+            .chain(self.vrps.iter().map(|s| (&s.identifier, s.to_domain(self))));
         for (name, fix) in fixes {
             let domain = match fix {
                 Ok(v) => v,
@@ -412,7 +413,11 @@ impl Sector {
         }
 
         let airspaces = self.airspaces.iter()
-            .map(|a| (&a.identifier, a.to_domain(self, AirspaceLayer::Default)));
+            .map(|a| (&a.identifier, a.to_domain(self, AirspaceLayer::Default)))
+            .chain(self.airspaces_high.iter()
+                .map(|a| (&a.identifier, a.to_domain(self, AirspaceLayer::High))))
+            .chain(self.airspaces_low.iter()
+                .map(|a| (&a.identifier, a.to_domain(self, AirspaceLayer::Low))));
         for (name, airspace) in airspaces {
             let domain = match airspace {
                 Ok(v) => v,
@@ -424,8 +429,27 @@ impl Sector {
 
             for level in 3..builder.levels() {
                 builder.apply_by_aabb(level, domain.aabb, |section| {
-                    println!("airspace {:?}", &section.division);
                     section.airspaces.push(domain.clone());
+                });
+            }
+        }
+
+        let airways = self.airways_high.iter()
+            .map(|a| (&a.identifier, a.to_domain(self, AirwayKind::High)))
+            .chain(self.airways_low.iter()
+                .map(|a| (&a.identifier, a.to_domain(self, AirwayKind::Low))));
+        for (name, airway) in airways {
+            let domain = match airway {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!("error converting airway {}: {}", name, err);
+                    continue;
+                }
+            };
+
+            for level in 3..builder.levels() {
+                builder.apply_by_aabb(level, domain.aabb, |section| {
+                    section.airways.push(domain.clone());
                 });
             }
         }
