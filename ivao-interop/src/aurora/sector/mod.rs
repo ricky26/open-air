@@ -13,6 +13,7 @@ use visual::Geo;
 
 use crate::aurora::gdf::{parse_colour, Statement};
 use crate::aurora::sector::airport::{Gate, Runway, Taxiway};
+use crate::aurora::sector::airspace::Airspace;
 use crate::aurora::sector::fixes::{Fix, NDB, VOR};
 use crate::aurora::sector::visual::FillColor;
 
@@ -23,6 +24,7 @@ mod parsing;
 mod visual;
 mod convert;
 mod airport;
+mod airspace;
 mod fixes;
 
 const INCLUDE_PATH: &str = "Include";
@@ -183,6 +185,10 @@ pub struct Sector {
     pub ndbs: Vec<NDB>,
     pub vors: Vec<VOR>,
 
+    pub airspaces: Vec<Airspace>,
+    pub airspaces_low: Vec<Airspace>,
+    pub airspaces_high: Vec<Airspace>,
+
     pub defines: HashMap<String, Colour>,
     pub geo: Vec<Geo>,
     pub fill_colors: Vec<FillColor>,
@@ -258,6 +264,37 @@ impl Sector {
             .filter_map(warn_filter)
             .collect();
 
+        let mut airspaces = Vec::new();
+        let mut airspaces_low = Vec::new();
+        let mut airspaces_high = Vec::new();
+
+        Airspace::from_iterator(
+            &mut airspaces,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("AIRSPACE")))?;
+        Airspace::from_iterator(
+            &mut airspaces,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("ARTCC")))?;
+
+        Airspace::from_iterator(
+            &mut airspaces_high,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("AIRSPACE_HIGH")))?;
+        Airspace::from_iterator(
+            &mut airspaces_high,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("ARTCC_HIGH")))?;
+
+        Airspace::from_iterator(
+            &mut airspaces_low,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("AIRSPACE_HIGH")))?;
+        Airspace::from_iterator(
+            &mut airspaces_low,
+            SectionStatementIter::from_section(
+                fs, &info.include_dirs, root_file.section("ARTCC_HIGH")))?;
+
         let geo = SectionStatementIter::from_section(
             fs, &info.include_dirs, root_file.section("GEO"))
             .filter_map(warn_filter)
@@ -314,6 +351,10 @@ impl Sector {
             fixes,
             ndbs,
             vors,
+
+            airspaces,
+            airspaces_high,
+            airspaces_low,
 
             defines,
             geo,

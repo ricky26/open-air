@@ -88,12 +88,19 @@ pub enum AirspaceLayer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AirspaceLabel {
+    pub map_position: (f64, f64),
+    pub font_size: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Airspace {
     pub id: String,
-    pub center: (f64, f64),
     pub layer: AirspaceLayer,
     pub points: Vec<(f64, f64)>,
     pub aabb: (f64, f64, f64, f64),
+    pub labels: Vec<AirspaceLabel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

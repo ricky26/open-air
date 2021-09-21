@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{Airport, Airspace, Airway, Point, Runway};
+use crate::domain::coords::calculate_aabb;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Palette(pub HashMap<String, u32>);
@@ -73,20 +74,7 @@ pub struct Shape {
 
 impl Shape {
     pub fn recalculate_aabb(&mut self) {
-        let mut points = self.map_points.iter().cloned();
-        let mut aabb = match points.next() {
-            Some((x, y)) => (x, y, x, y),
-            None => (0., 0., 0., 0.),
-        };
-
-        for (x, y) in points {
-            aabb.0 = aabb.0.min(x);
-            aabb.1 = aabb.1.min(y);
-            aabb.2 = aabb.2.max(x);
-            aabb.3 = aabb.3.max(y);
-        }
-
-        self.map_aabb = aabb;
+        self.map_aabb = calculate_aabb(self.map_points.iter().cloned());
     }
 }
 

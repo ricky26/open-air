@@ -8,6 +8,7 @@ use log::warn;
 use open_air::domain::viewer::{aabb_intersects, Colour, Label, normalise_aabb, SectionBuilder, Shape};
 
 use crate::aurora::sector::Sector;
+use open_air::domain::AirspaceLayer;
 
 struct PartialPolygon {
     shape: Shape,
@@ -406,6 +407,25 @@ impl Sector {
             for level in 3..builder.levels() {
                 builder.apply_by_aabb(level, aabb, |section| {
                     section.points.push(domain.clone());
+                });
+            }
+        }
+
+        let airspaces = self.airspaces.iter()
+            .map(|a| (&a.identifier, a.to_domain(self, AirspaceLayer::Default)));
+        for (name, airspace) in airspaces {
+            let domain = match airspace {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!("error converting airspace {}: {}", name, err);
+                    continue;
+                }
+            };
+
+            for level in 3..builder.levels() {
+                builder.apply_by_aabb(level, domain.aabb, |section| {
+                    println!("airspace {:?}", &section.division);
+                    section.airspaces.push(domain.clone());
                 });
             }
         }

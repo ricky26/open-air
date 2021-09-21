@@ -13,3 +13,20 @@ pub fn map_to_geo(x: f64, y: f64) -> (f64, f64) {
         .to_degrees();
     (latitude, longitude)
 }
+
+pub fn calculate_aabb(mut pts: impl Iterator<Item=(f64, f64)>) -> (f64, f64, f64, f64) {
+    let mut aabb = if let Some((x, y)) = pts.next() {
+        (x, y, x, y)
+    } else {
+        (0., 0., 0., 0.)
+    };
+
+    for pt in pts {
+        aabb.0 = aabb.0.min(pt.0);
+        aabb.1 = aabb.1.min(pt.1);
+        aabb.2 = aabb.2.max(pt.0);
+        aabb.3 = aabb.3.max(pt.1);
+    }
+
+    aabb
+}
