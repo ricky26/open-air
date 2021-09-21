@@ -9,21 +9,23 @@ const TEXT_SCALE = 0.5;
 const FONT_FAMILY = 'Roboto';
 
 const PALETTE = {
-  COAST: '#444',
-  PIER: '#444',
-  DANGER: '#4027bd',
-  RESTRICT: '#4027bd',
-  PROHIBIT: '#4027bd',
+  COAST: '#272727',
+  PIER: '#002412',
+  DANGER: '#443402',
+  RESTRICT: '#242300',
+  PROHIBIT: '#310c02',
   TAXI_CENTER: '#0d0',
-  TAXIWAY: 'white',
-  RUNWAY: '#7b6245',
-  STOPBAR: 'white',
-  STOPLINE: 'white',
-  BUILDING: 'black',
+  TAXIWAY: '#00ea75',
+  RUNWAY: '#2d1c2c',
+  STOPBAR: '#b30000',
+  BUILDING: '#a0a0a0',
+  APRON: '#2c1c2c',
+  AIRPORTLABEL: '#282828',
+  FIXLABEL: '#404040',
 
   // Extras
+  STOPLINE: 'white',
   GRASS: 'green',
-  APRON: 'gray',
   DYN_ACC_BKGND: 'transparent',
   DYN_ACC_CONTOUR: 'transparent',
   ILSDRAW: 'white',
@@ -349,9 +351,9 @@ export class MapService {
         context.font = font;
         context.textAlign = 'left';
         context.textBaseline = 'top';
-        context.fillStyle = 'white';
-        context.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        context.shadowBlur = 4;
+        context.fillStyle = PALETTE.AIRPORTLABEL;
+        context.shadowColor = 'rgba(255, 255, 255, 0.2)';
+        context.shadowBlur = 3;
         context.fillText(label.text, 6, 6);
 
         return {canvas};
@@ -391,7 +393,7 @@ export class MapService {
         context.font = font;
         context.textAlign = 'left';
         context.textBaseline = 'top';
-        context.fillStyle = 'pink';
+        context.fillStyle = PALETTE.FIXLABEL;
         context.shadowColor = 'rgba(0, 0, 0, 0.2)';
         context.shadowBlur = 4;
         context.fillText(point.name, 6, 6);
