@@ -33,6 +33,7 @@ export function normaliseAabb(a) {
     a[1] = a[3];
     a[3] = q;
   }
+  return a;
 }
 
 export function aabbIntersects(a, b) {

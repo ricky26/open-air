@@ -363,6 +363,10 @@ impl Sector {
             ));
 
             for level in 0..builder.levels() {
+                if !builder.include_aabb(level, aabb) {
+                    continue
+                }
+
                 builder.apply_by_aabb(level, aabb, |section| {
                     section.runways.push(domain.clone());
                 });

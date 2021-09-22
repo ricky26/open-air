@@ -8,6 +8,7 @@ export const PALETTE = {
   TAXI_CENTER: '#0d0',
   TAXIWAY: '#00ea75',
   RUNWAY: '#2d1c2c',
+  RUNWAYCENTER: '#9aa3f1',
   STOPBAR: '#b30000',
   BUILDING: '#a0a0a0',
   APRON: '#2c1c2c',
