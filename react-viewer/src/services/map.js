@@ -105,9 +105,6 @@ export class MapRenderer {
     this.canvas = canvas;
     this.context = canvas.getContext('2d');
 
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-
     this.updateTransform();
 
     const {width: bufferW, height: bufferH} = canvas;

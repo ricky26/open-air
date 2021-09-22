@@ -30,7 +30,23 @@ export class SectionSource {
       ttl: 60_000,
       async allocate() {
         const path = `sections/${key}.json`;
-        const resp = await fetch(path);
+        const resp = await fetch(path, {
+          headers: {'Accept': 'application/json'},
+        });
+
+        if (resp.status === 404) {
+          // Return an empty section for simplicity.
+          return {
+            shapes: [],
+            labels: [],
+            points: [],
+            airports: [],
+            runways: [],
+            airspaces: [],
+            airways: [],
+          };
+        }
+
         return await resp.json();
       },
     });

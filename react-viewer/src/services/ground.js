@@ -1,18 +1,13 @@
-import {TileRenderer} from "./tile";
+import {SectionRenderer} from "./tile";
 import {aabbIntersects} from "./coords";
-import {parseStyle} from "./palette";
+import {PALETTE, parseStyle} from "./palette";
 
-//const TEXT_SCALE = 0.5;
-//const FONT_FAMILY = 'Roboto';
+const TEXT_SCALE = 0.5;
+const FONT_FAMILY = 'Roboto';
 
-export class GroundRenderer extends TileRenderer {
+export class GroundRenderer extends SectionRenderer {
   constructor(cache, sections, size) {
-    super('ground-tile', cache, size);
-    this.sections = sections;
-  }
-
-  _tileData(level, x, y) {
-    return this.sections.get(level, x, y);
+    super('ground-tile', cache, sections, size);
   }
 
   _renderTile(canvas, ctx, level, x, y, section) {
@@ -65,18 +60,27 @@ export class GroundRenderer extends TileRenderer {
       }
     }
   }
+}
 
-  /*
-  drawLabels(renderer, level, x, y, dx, dy, dw, dh) {
-    const section = this.sections.get(level, x, y);
-    if (section === null) {
-      return;
-    }
+export class LabelsRenderer extends SectionRenderer {
+  constructor(cache, sections, size) {
+    super('labels', cache, sections, size);
+  }
 
-    const divisions = 1 << level;
-    const scale = 1 / divisions;
-    const worldMinX = x * scale;
-    const worldMinY = y * scale;
+  _renderTile(canvas, ctx, level, x, y, section) {
+    //const divisions = 1 << level;
+    //const scale = 1 / divisions;
+    //const minX = x * scale;
+    //const minY = y * scale;
+    //const maxX = minX + scale;
+    //const maxY = minY + scale;
+    ctx.setTransform(this.size, 0, 0, this.size, 0, 0);
+
+    ctx.moveTo(0, 0);
+    ctx.lineTo(1, 1);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 0.001;
+    ctx.stroke();
 
     for (const label of section.labels) {
       const fontSize = label.fontSize * TEXT_SCALE * (1.1 ** level);
@@ -84,44 +88,14 @@ export class GroundRenderer extends TileRenderer {
         continue;
       }
 
-      const key = `label:${level}:${label.text}`;
-      const entry = this.cache.allocate({
-        key
-        allocate: () => {
-          const {canvas, context} = createCanvas();
-          const font = `${fontSize}pt ${FONT_FAMILY}`;
-
-          // Calculate text size.
-          context.font = font;
-          context.textAlign = 'left';
-          context.textBaseline = 'top';
-          const {width, actualBoundingBoxDescent: height} = context.measureText(label.text);
-          canvas.width = width + 12;
-          canvas.height = height + 12;
-
-          // Render text
-          context.font = font;
-          context.textAlign = 'left';
-          context.textBaseline = 'top';
-          context.fillStyle = PALETTE.AIRPORTLABEL;
-          context.shadowColor = 'rgba(255, 255, 255, 0.2)';
-          context.shadowBlur = 3;
-          context.fillText(label.text, 6, 6);
-
-          return {canvas};
-        },
-        free: freeCanvas,
-      });
-      if (entry === null) {
-        continue;
-      }
-
-      const x = dx + (label.mapPosition[0] - worldMinX) / scale * dw;
-      const y = dy + (label.mapPosition[1] - worldMinY) / scale * dh;
-      const {canvas} = entry.value;
-      const w = canvas.width / pixelScale;
-      const h = canvas.height / pixelScale;
-      ctx.drawImage(canvas, x - w * 0.5, y - h * 0.5, w, h);
+      const font = `${fontSize}pt ${FONT_FAMILY}`;
+      ctx.font = font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = PALETTE.AIRPORTLABEL;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
+      ctx.shadowBlur = 3;
+      ctx.fillText(label.text, 6, 6);
     }
 
     for (const point of section.points) {
@@ -130,56 +104,14 @@ export class GroundRenderer extends TileRenderer {
         continue;
       }
 
-      const key = `point_${level}_${point.name}`;
-      const entry = this.tileCache.allocate(key, () => {
-        const {canvas, context} = createCanvas();
-        const font = `${fontSize}pt ${FONT_FAMILY}`;
-
-        // Calculate text size.
-        context.font = font;
-        context.textAlign = 'left';
-        context.textBaseline = 'top';
-        const {width, actualBoundingBoxDescent: height} = context.measureText(point.name);
-        canvas.width = width + 12;
-        canvas.height = height + 12;
-
-        // Render text
-        context.font = font;
-        context.textAlign = 'left';
-        context.textBaseline = 'top';
-        context.fillStyle = PALETTE.FIXLABEL;
-        context.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        context.shadowBlur = 4;
-        context.fillText(point.name, 6, 6);
-
-        return {canvas};
-      }, freeCanvas);
-      if (entry === null) {
-        continue;
-      }
-
-      const x = dx + (point.position[0] - worldMinX) / scale * dw;
-      const y = dy + (point.position[1] - worldMinY) / scale * dh;
-      const {canvas} = entry.value;
-      const w = canvas.width / pixelScale;
-      const h = canvas.height / pixelScale;
-      ctx.drawImage(canvas, x - w * 0.5, y - h * 0.5, w, h);
-
+      const font = `${fontSize}pt ${FONT_FAMILY}`;
+      ctx.font = font;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = PALETTE.FIXLABEL;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(point.name, 6, 6);
     }
   }
-
-  draw(renderer) {
-    const {worldX: x, worldY: y, worldWidth: w, worldHeight: h} = renderer;
-    const level = renderer.levelForSize(this.size);
-    const [minX, minY, maxX, maxY, , scale] = this.tileRange(x, y, w, h, level);
-
-    super.draw(renderer);
-
-    // Render labels
-    for (let tx = minX; tx < maxX; ++tx) {
-      for (let ty = minY; ty < maxY; ++ty) {
-        this.drawLabels(ctx, level, pixelScale, tx, ty, tx * scale, ty * scale, scale, scale);
-      }
-    }
-  }*/
 }

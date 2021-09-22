@@ -5,7 +5,7 @@ import {CssBaseline} from "@mui/material";
 import Layout from "./Layout";
 import Map from "./Map";
 import './App.css';
-import {GroundRenderer} from "../services/ground";
+import {GroundRenderer, LabelsRenderer} from "../services/ground";
 import {Cache} from "../services/cache";
 import {SectionSource} from "../services/sectionData";
 
@@ -31,10 +31,15 @@ function MainMapView() {
     setTransform({worldX, worldY, zoom, rotation});
   }, [setTransform]);
 
-  const groundTiles = useMemo(() => new GroundRenderer(Cache.default, SectionSource.default, 1024), []);
+  const cache = Cache.default;
+  const sections = SectionSource.default;
+
+  const groundTiles = useMemo(() => new GroundRenderer(cache, sections, 1024), [cache, sections]);
+  const groundLabels = useMemo(() => new LabelsRenderer(cache, sections, 1024), [cache, sections]);
   const render = useCallback(renderer => {
     groundTiles.draw(renderer);
-  }, [groundTiles]);
+    groundLabels.draw(renderer);
+  }, [groundTiles, groundLabels]);
 
   return (
     <Map

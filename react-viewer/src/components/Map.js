@@ -1,11 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef} from "react";
 import {MapRenderer} from "../services/map";
-import {Cache} from "../services/cache";
-import {GroundRenderer} from "../services/ground";
-import {SectionSource} from "../services/sectionData";
 import "./Map.css";
 
-const noop = () => {};
+const noop = () => {
+};
 
 export default function Map(props) {
   const {

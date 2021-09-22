@@ -1,7 +1,7 @@
 import {createCanvas, freeCanvas} from "./rendering";
 import {hsv2rgb, rgbToStr} from "./palette";
 
-const DEBUG_TILES = true;
+const DEBUG_TILES = false;
 
 export class TileRenderer {
   constructor(prefix, cache, size) {
@@ -141,5 +141,16 @@ export class TileRenderer {
         this.drawTile(renderer, level, tx, ty, offX + tx * viewTileSize, offY + ty * viewTileSize, viewTileSize, viewTileSize);
       }
     }
+  }
+}
+
+export class SectionRenderer extends TileRenderer {
+  constructor(prefix, cache, sections, size) {
+    super(prefix, cache, size);
+    this.sections = sections;
+  }
+
+  _tileData(level, x, y) {
+    return this.sections.get(level, x, y);
   }
 }
