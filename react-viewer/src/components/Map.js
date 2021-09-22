@@ -1,69 +1,41 @@
-import {useCallback, useEffect, useRef} from "react";
-import {DEG2RAD, useMap} from "../services/map";
+import {useCallback, useEffect, useMemo, useRef} from "react";
+import {MapRenderer} from "../services/map";
+import {Cache} from "../services/cache";
+import {GroundRenderer} from "../services/ground";
+import {SectionSource} from "../services/sectionData";
 import "./Map.css";
 
-function clientToWorldScale(canvas, transform) {
-  return Math.min(canvas.clientWidth, canvas.clientHeight) * (2 ** transform.zoom);
-}
-
-function clientToWorld(canvas, transform, x, y) {
-  const scale = clientToWorldScale(canvas, transform);
-  const tx = transform.x + (x - canvas.clientWidth * 0.5) / scale;
-  const ty = transform.y + (y - canvas.clientHeight * 0.5) / scale;
-  return [tx, ty];
-}
+const noop = () => {};
 
 export default function Map(props) {
   const {
     zoom = 1,
-    x = 0,
-    y = 0,
+    worldX = 0,
+    worldY = 0,
     rotation = 0,
     onTransform = null,
+    render,
   } = props;
-  const transform = useRef({x, y, zoom, rotation});
-  Object.assign(transform.current, {x, y, zoom, rotation});
-
   const canvas = useRef();
-  const mapService = useMap();
+  const renderer = useMemo(() => new MapRenderer(), []);
+  const dpiScale = window.devicePixelRatio || 1;
+
+  renderer.worldX = worldX;
+  renderer.worldY = worldY;
+  renderer.rotation = rotation;
+  renderer.zoom = zoom;
+  renderer.dpiScale = dpiScale;
 
   useEffect(() => {
     let running = true;
 
     function draw() {
-      canvas.current.width = canvas.current.clientWidth;
-      canvas.current.height = canvas.current.clientHeight;
+      if (canvas.current) {
+        canvas.current.width = canvas.current.clientWidth * dpiScale;
+        canvas.current.height = canvas.current.clientHeight * dpiScale;
 
-      const ctx = canvas.current.getContext('2d');
-      const {
-        clientWidth: screenW,
-        clientHeight: screenH,
-        width: bufferW,
-        height: bufferH,
-      } = canvas.current;
-
-      const {x, y, zoom, rotation} = transform.current;
-      const bufferMin = Math.min(bufferW, bufferH);
-      const zoomScale = 2 ** zoom;
-      const scale = bufferMin * zoomScale;
-      const cosR = Math.cos(rotation * DEG2RAD);
-      const sinR = Math.sin(rotation * DEG2RAD);
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, bufferW, bufferH);
-      ctx.setTransform(scale, 0, 0, scale, screenW / 2, screenH / 2);
-      ctx.transform(cosR, -sinR, sinR, cosR, -x, -y);
-
-      const level = Math.max(0, Math.floor(Math.log2(scale * 1.2 / mapService.tileSize)));
-
-      // TODO: this will need to handle all 4 corners come rotation.
-      const [minX, minY] = clientToWorld(canvas.current, transform.current, 0, 0);
-      const [maxX, maxY] = clientToWorld(canvas.current, transform.current, screenW, screenH);
-      const worldW = maxX - minX;
-      const worldH = maxY - minY;
-
-      mapService.quota = 1;
-      mapService.draw(ctx, minX, minY, worldW, worldH, level, scale);
+        renderer.render(canvas.current, render || noop);
+      }
 
       if (running) {
         requestAnimationFrame(draw);
@@ -90,23 +62,23 @@ export default function Map(props) {
     mouseState.current.active = true;
     mouseState.current.startMouseX = event.clientX;
     mouseState.current.startMouseY = event.clientY;
-    mouseState.current.startX = transform.current.x;
-    mouseState.current.startY = transform.current.y;
-  }, [mouseState, transform]);
+    mouseState.current.startX = renderer.worldX;
+    mouseState.current.startY = renderer.worldY;
+  }, [mouseState, renderer]);
 
   const updateMouseDrag = useCallback(event => {
     const scale = Math.min(canvas.current.clientWidth, canvas.current.clientHeight)
-      * (2 ** transform.current.zoom);
+      * (2 ** renderer.zoom);
     const dmx = mouseState.current.startMouseX - event.clientX;
     const dmy = mouseState.current.startMouseY - event.clientY;
 
-    const x = mouseState.current.startX + dmx / scale;
-    const y = mouseState.current.startY + dmy / scale;
+    const worldX = mouseState.current.startX + dmx / scale;
+    const worldY = mouseState.current.startY + dmy / scale;
 
     if (onTransform) {
-      onTransform({...transform.current, x, y});
+      onTransform({...renderer.transform(), worldX, worldY});
     }
-  }, [onTransform, mouseState, transform]);
+  }, [onTransform, mouseState, renderer]);
 
   const handleMouseMove = useCallback(event => {
     if (!mouseState.current.active) {
@@ -130,22 +102,27 @@ export default function Map(props) {
     const zoomDelta = event.deltaY * 0.01;
 
     const newTransform = {
-      ...transform.current,
-      zoom: Math.max(0, transform.current.zoom - zoomDelta),
+      ...renderer.transform(),
+      zoom: Math.max(0, renderer.zoom - zoomDelta),
     };
 
+    const newRenderer = Object.assign(new MapRenderer(), renderer, newTransform);
+    newRenderer.updateTransform();
+
     // Reposition so the cursor is over the same position it was before.
-    const [x1, y1] = clientToWorld(canvas.current, transform.current, event.clientX, event.clientY);
-    const [x2, y2] = clientToWorld(canvas.current, newTransform, event.clientX, event.clientY);
+    const viewX = event.clientX - renderer.canvas.clientWidth * 0.5;
+    const viewY = event.clientY - renderer.canvas.clientHeight * 0.5;
+    const [x1, y1] = renderer.viewToWorld(viewX, viewY);
+    const [x2, y2] = newRenderer.viewToWorld(viewX, viewY);
     const dx = x1 - x2;
     const dy = y1 - y2;
-    newTransform.x += dx;
-    newTransform.y += dy;
+    newTransform.worldX += dx;
+    newTransform.worldY += dy;
 
     if (onTransform) {
       onTransform(newTransform);
     }
-  }, [onTransform, canvas, transform]);
+  }, [onTransform, renderer]);
 
   return (
     <canvas
