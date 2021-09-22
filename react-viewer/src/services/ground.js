@@ -81,8 +81,7 @@ export class LabelsRenderer extends SectionRenderer {
         continue;
       }
 
-      const font = `bold ${fontSize}pt ${FONT_FAMILY}`;
-      context.font = font;
+      context.font = `bold ${fontSize}pt ${FONT_FAMILY}`;
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = PALETTE.AIRPORTLABEL;
@@ -102,8 +101,7 @@ export class LabelsRenderer extends SectionRenderer {
         continue;
       }
 
-      const font = `${fontSize}pt ${FONT_FAMILY}`;
-      context.font = font;
+      context.font = `${fontSize}pt ${FONT_FAMILY}`;
       context.textAlign = 'left';
       context.textBaseline = 'top';
       context.fillStyle = PALETTE.FIXLABEL;
