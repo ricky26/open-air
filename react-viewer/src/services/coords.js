@@ -21,7 +21,7 @@ export function boxToAABB([vx0, vy0, vx1, vy1], sin, cos) {
   return [width, height, minX, minY, maxX, maxY];
 }
 
-export function normaliseAabb(a) {
+export function normaliseRect(a) {
   if (a[2] < a[0]) {
     const q = a[0];
     a[0] = a[2];
@@ -36,9 +36,9 @@ export function normaliseAabb(a) {
   return a;
 }
 
-export function aabbIntersects(a, b) {
-  normaliseAabb(a);
-  normaliseAabb(b);
+export function rectIntersects(a, b) {
+  normaliseRect(a);
+  normaliseRect(b);
 
   const aw = a[2] - a[0];
   const ah = a[3] - a[1];

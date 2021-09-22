@@ -82,7 +82,7 @@ impl Fix {
                 is_boundary: self.boundary,
             },
             name: self.identifier.clone(),
-            position,
+            map_position: position,
         })
     }
 }
@@ -122,7 +122,7 @@ impl NDB {
                 frequency: frequency_to_int(&self.frequency)?,
             },
             name: self.identifier.clone(),
-            position,
+            map_position: position,
         })
     }
 }
@@ -163,7 +163,7 @@ impl VOR {
                 frequency: frequency_to_int(&self.frequency)?,
             },
             name: self.identifier.clone(),
-            position,
+            map_position: position,
         })
     }
 }
@@ -220,7 +220,7 @@ impl VRP {
                 altitude: self.altitude,
             },
             name: self.identifier.clone(),
-            position,
+            map_position: position,
         })
     }
 }

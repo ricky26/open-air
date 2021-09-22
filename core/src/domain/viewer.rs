@@ -50,13 +50,13 @@ pub struct Label {
     pub map_position: (f64, f64),
 
     pub filter: LayerFilter,
-    pub map_aabb: (f64, f64, f64, f64),
+    pub map_bounds: (f64, f64, f64, f64),
 }
 
 impl Label {
     pub fn recalculate_aabb(&mut self) {
         let (x, y) = self.map_position;
-        self.map_aabb = (x - 1., y - 1., x + 1., y + 1.);
+        self.map_bounds = (x - 1., y - 1., x + 1., y + 1.);
     }
 }
 
@@ -69,12 +69,12 @@ pub struct Shape {
     pub map_points: Vec<(f64, f64)>,
 
     pub filter: LayerFilter,
-    pub map_aabb: (f64, f64, f64, f64),
+    pub map_bounds: (f64, f64, f64, f64),
 }
 
 impl Shape {
     pub fn recalculate_aabb(&mut self) {
-        self.map_aabb = calculate_aabb(self.map_points.iter().cloned());
+        self.map_bounds = calculate_aabb(self.map_points.iter().cloned());
     }
 }
 
@@ -88,7 +88,7 @@ pub struct Global {
 #[serde(rename_all = "camelCase")]
 pub struct Section {
     pub division: (i16, i16, i16),
-    pub map_aabb: (f64, f64, f64, f64),
+    pub map_bounds: (f64, f64, f64, f64),
 
     pub labels: Vec<Label>,
     pub shapes: Vec<Shape>,
@@ -132,7 +132,7 @@ impl SectionBuilder {
         (self.truncate_f64(level, v.0), self.truncate_f64(level, v.1))
     }
 
-    pub fn include_aabb(&self, level: i16, aabb: (f64, f64, f64, f64)) -> bool {
+    pub fn include_rect(&self, level: i16, aabb: (f64, f64, f64, f64)) -> bool {
         if level >= self.levels() - 1 {
             true
         } else {
@@ -153,7 +153,7 @@ impl SectionBuilder {
 
             self.sections.insert((level, x, y), Section {
                 division: (level, x, y),
-                map_aabb: (
+                map_bounds: (
                     (x as f64) * scale,
                     (y as f64) * scale,
                     ((x + 1) as f64) * scale,
@@ -166,7 +166,7 @@ impl SectionBuilder {
         self.sections.get_mut(&(level, x, y)).unwrap()
     }
 
-    pub fn apply_by_aabb(&mut self, level: i16, aabb: (f64, f64, f64, f64), mut f: impl FnMut(&mut Section)) {
+    pub fn apply_by_bounds(&mut self, level: i16, aabb: (f64, f64, f64, f64), mut f: impl FnMut(&mut Section)) {
         let divisions = (1 << level) as f64;
         let x_min = (aabb.0.min(aabb.2) * divisions).floor() as i16;
         let x_max = (aabb.0.max(aabb.2) * divisions).ceil() as i16;

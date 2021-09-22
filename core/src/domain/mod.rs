@@ -30,7 +30,7 @@ pub struct Point {
     pub kind: PointKind,
 
     pub name: String,
-    pub position: (f64, f64),
+    pub map_position: (f64, f64),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ pub struct Airport {
     pub identifier: String,
     pub elevation: f64,
     pub transition_altitude: f64,
-    pub position: (f64, f64),
+    pub map_position: (f64, f64),
     pub name: String,
     pub hide_tag: bool,
 }
@@ -60,7 +60,7 @@ pub struct Runway {
     pub opposite_id: String,
     pub primary_course: f32,
     pub opposite_course: f32,
-    pub points: [(f64, f64, f32); 2],
+    pub map_points: [(f64, f64, f32); 2],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,8 +81,8 @@ pub struct AirwayLabel {
 pub struct Airway {
     pub kind: AirwayKind,
     pub name: String,
-    pub points: Vec<(f64, f64)>,
-    pub aabb: (f64, f64, f64, f64),
+    pub map_points: Vec<(f64, f64)>,
+    pub map_bounds: (f64, f64, f64, f64),
     pub labels: Vec<AirwayLabel>,
 }
 
@@ -106,8 +106,8 @@ pub struct AirspaceLabel {
 pub struct Airspace {
     pub id: String,
     pub layer: AirspaceLayer,
-    pub points: Vec<(f64, f64)>,
-    pub aabb: (f64, f64, f64, f64),
+    pub map_points: Vec<(f64, f64)>,
+    pub map_bounds: (f64, f64, f64, f64),
     pub labels: Vec<AirspaceLabel>,
 }
 

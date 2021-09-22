@@ -1,5 +1,5 @@
 import {SectionRenderer} from "./tile";
-import {aabbIntersects, normaliseAabb, rectContains} from "./coords";
+import {normaliseRect, rectContains, rectIntersects} from "./coords";
 import {PALETTE, parseStyle} from "./style";
 
 const TEXT_SCALE = 0.6;
@@ -12,14 +12,14 @@ export class GroundRenderer extends SectionRenderer {
 
   _renderTile(renderer, level, x, y, section) {
     const {context, transform} = renderer;
-    const sectionAabb = renderer.viewTransform.worldBounds;
+    const {worldBounds} = renderer.viewTransform;
 
     // Render ground shapes
     for (const shape of section.shapes) {
       const strokeStyle = parseStyle(shape.strokeColour);
       const fillStyle = parseStyle(shape.fillColour);
 
-      if (!aabbIntersects(sectionAabb, shape.mapAabb)) {
+      if (!rectIntersects(worldBounds, shape.mapBounds)) {
         continue;
       }
 
@@ -56,9 +56,9 @@ export class GroundRenderer extends SectionRenderer {
 
     context.save();
     for (const runway of section.runways) {
-      const [a, b] = runway.points;
-      const aabb = normaliseAabb([a[0], a[1], b[0], b[1]]);
-      if (!aabbIntersects(sectionAabb, aabb)) {
+      const [a, b] = runway.mapPoints;
+      const bounds = normaliseRect([a[0], a[1], b[0], b[1]]);
+      if (!rectIntersects(worldBounds, bounds)) {
         continue;
       }
 
@@ -121,7 +121,7 @@ export class LabelsRenderer extends SectionRenderer {
         continue;
       }
 
-      const [px, py] = transform.project(...point.position);
+      const [px, py] = transform.project(...point.mapPosition);
       if (!rectContains(safeViewBounds, [px, py])) {
         continue;
       }
@@ -139,7 +139,7 @@ export class LabelsRenderer extends SectionRenderer {
     if (level > 7) {
       context.save();
       for (const runway of section.runways) {
-        const [a, b] = runway.points;
+        const [a, b] = runway.mapPoints;
 
         const pa = transform.project(...a);
         const pb = transform.project(...b);

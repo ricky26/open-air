@@ -41,8 +41,8 @@ impl Airspace {
         Ok(domain::Airspace {
             id: self.identifier.to_string(),
             layer,
-            points,
-            aabb,
+            map_points: points,
+            map_bounds: aabb,
             labels,
         })
     }
@@ -124,8 +124,8 @@ impl Airway {
         Ok(domain::Airway {
             name: self.identifier.to_string(),
             kind,
-            points,
-            aabb,
+            map_points: points,
+            map_bounds: aabb,
             labels,
         })
     }

@@ -217,11 +217,11 @@ impl Sector {
                 }
                 shape.recalculate_aabb();
 
-                if !builder.include_aabb(level, shape.map_aabb) {
+                if !builder.include_rect(level, shape.map_bounds) {
                     continue;
                 }
 
-                builder.apply_by_aabb(level, shape.map_aabb, |section| {
+                builder.apply_by_bounds(level, shape.map_bounds, |section| {
                     section.shapes.push(shape.clone());
                 });
             }
@@ -264,18 +264,18 @@ impl Sector {
             }
 
             for mut shape in poly_builder.build() {
-                if shape.map_points.len() < 2 || !builder.include_aabb(level, shape.map_aabb) {
+                if shape.map_points.len() < 2 || !builder.include_rect(level, shape.map_bounds) {
                     continue;
                 }
 
                 simplify_shape(builder, &mut shape, level);
 
-                builder.apply_by_aabb(level, shape.map_aabb, |section| {
+                builder.apply_by_bounds(level, shape.map_bounds, |section| {
                     // If we're encompassed, just use the original shape.
-                    if shape.map_aabb.0 >= section.map_aabb.0
-                        && shape.map_aabb.1 >= section.map_aabb.1
-                        && shape.map_aabb.2 <= section.map_aabb.2
-                        && shape.map_aabb.3 <= section.map_aabb.3 {
+                    if shape.map_bounds.0 >= section.map_bounds.0
+                        && shape.map_bounds.1 >= section.map_bounds.1
+                        && shape.map_bounds.2 <= section.map_bounds.2
+                        && shape.map_bounds.3 <= section.map_bounds.3 {
                         section.shapes.push(shape.clone());
                         return;
                     }
@@ -302,7 +302,7 @@ impl Sector {
                         let y1 = a.1.max(b.1).max(c.1);
                         let aabb = (x0, y0, x1, y1);
 
-                        if aabb_intersects(aabb, section.map_aabb) {
+                        if aabb_intersects(aabb, section.map_bounds) {
                             if to_insert.is_none() {
                                 to_insert = Some(Shape {
                                     fill_colour: shape.fill_colour.clone(),
@@ -310,7 +310,7 @@ impl Sector {
                                     stroke_width: shape.stroke_width,
                                     map_points: Vec::new(),
                                     filter: shape.filter.clone(),
-                                    map_aabb: shape.map_aabb,
+                                    map_bounds: shape.map_bounds,
                                 });
                             }
 
@@ -343,11 +343,11 @@ impl Sector {
                 font_size: 8.,
                 map_position,
                 filter: Default::default(),
-                map_aabb,
+                map_bounds: map_aabb,
             };
 
             for level in 0..builder.levels() {
-                builder.apply_by_aabb(level, map_aabb, |section| {
+                builder.apply_by_bounds(level, map_aabb, |section| {
                     section.labels.push(label.clone());
                 });
             }
@@ -356,18 +356,18 @@ impl Sector {
         for runway in self.runways.iter() {
             let domain = runway.to_domain(self)?;
             let aabb = normalise_aabb((
-                domain.points[0].0,
-                domain.points[0].1,
-                domain.points[1].0,
-                domain.points[1].1,
+                domain.map_points[0].0,
+                domain.map_points[0].1,
+                domain.map_points[1].0,
+                domain.map_points[1].1,
             ));
 
             for level in 0..builder.levels() {
-                if !builder.include_aabb(level, aabb) {
+                if !builder.include_rect(level, aabb) {
                     continue
                 }
 
-                builder.apply_by_aabb(level, aabb, |section| {
+                builder.apply_by_bounds(level, aabb, |section| {
                     section.runways.push(domain.clone());
                 });
             }
@@ -376,7 +376,7 @@ impl Sector {
         for gate in self.gates.iter() {
             let domain = gate.to_label(self)?;
             for level in 7..builder.levels() {
-                builder.apply_by_aabb(level, domain.map_aabb, |section| {
+                builder.apply_by_bounds(level, domain.map_bounds, |section| {
                     section.labels.push(domain.clone());
                 });
             }
@@ -385,7 +385,7 @@ impl Sector {
         for taxiway in self.taxiways.iter() {
             let domain = taxiway.to_label(self)?;
             for level in 6..builder.levels() {
-                builder.apply_by_aabb(level, domain.map_aabb, |section| {
+                builder.apply_by_bounds(level, domain.map_bounds, |section| {
                     section.labels.push(domain.clone());
                 });
             }
@@ -404,13 +404,13 @@ impl Sector {
                 }
             };
             let aabb = (
-                domain.position.0,
-                domain.position.1,
-                domain.position.0,
-                domain.position.1,
+                domain.map_position.0,
+                domain.map_position.1,
+                domain.map_position.0,
+                domain.map_position.1,
             );
             for level in 3..builder.levels() {
-                builder.apply_by_aabb(level, aabb, |section| {
+                builder.apply_by_bounds(level, aabb, |section| {
                     section.points.push(domain.clone());
                 });
             }
@@ -432,7 +432,7 @@ impl Sector {
             };
 
             for level in 3..builder.levels() {
-                builder.apply_by_aabb(level, domain.aabb, |section| {
+                builder.apply_by_bounds(level, domain.map_bounds, |section| {
                     section.airspaces.push(domain.clone());
                 });
             }
@@ -452,7 +452,7 @@ impl Sector {
             };
 
             for level in 3..builder.levels() {
-                builder.apply_by_aabb(level, domain.aabb, |section| {
+                builder.apply_by_bounds(level, domain.map_bounds, |section| {
                     section.airways.push(domain.clone());
                 });
             }

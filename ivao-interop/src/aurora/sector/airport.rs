@@ -125,7 +125,7 @@ impl Runway {
             opposite_id,
             primary_course: self.primary_course,
             opposite_course: self.opposite_course,
-            points: [a, b],
+            map_points: [a, b],
         })
     }
 }
@@ -171,7 +171,7 @@ impl Taxiway {
             text: self.identifier.to_string(),
             font_size: 6.0,
             map_position,
-            map_aabb,
+            map_bounds: map_aabb,
             filter: Default::default(),
         })
     }
@@ -217,7 +217,7 @@ impl Gate {
             text: self.identifier.to_string(),
             font_size: 4.0,
             map_position,
-            map_aabb,
+            map_bounds: map_aabb,
             filter: Default::default(),
         })
     }
