@@ -1,5 +1,5 @@
-import {createCanvas, freeCanvas} from "./rendering";
-import {hsv2rgb, rgbToStr} from "./palette";
+import {createCanvas, freeCanvas, Renderer, Transform} from "./rendering";
+import {hsv2rgb, rgbToStr} from "./style";
 
 const DEBUG_TILES = false;
 
@@ -21,7 +21,7 @@ export class TileRenderer {
     return null;
   }
 
-  _renderTile(canvas, ctx, level, x, y) {
+  _renderTile(renderer, level, x, y) {
   }
 
   renderTile(level, x, y) {
@@ -54,11 +54,24 @@ export class TileRenderer {
         canvas.height = this.size;
 
         if (DEBUG_TILES) {
-          ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 1, 0.1));
+          ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 1, 0.07));
           ctx.fillRect(0, 0, this.size, this.size);
         }
 
-        this._renderTile(canvas, ctx, level, x, y, data);
+        const scale = 1 << level;
+        const invScale = 1 / scale;
+        const worldX = x * invScale;
+        const worldY = y * invScale;
+
+        const renderer = new Renderer(canvas);
+        renderer.viewTransform.transform = Transform.from({
+          x: worldX,
+          y: worldY,
+          scale: this.size * scale,
+          rotation: 0,
+        });
+        renderer.viewTransform.viewRect = [0, 0, this.size, this.size];
+        renderer.render(() => this._renderTile(renderer, level, x, y, data));
         return {canvas};
       },
       free: freeCanvas,
@@ -100,13 +113,13 @@ export class TileRenderer {
   }
 
   tileRange(renderer, level) {
-    const {worldMinX, worldMinY, worldMaxX, worldMaxY} = renderer;
+    const [worldMinX, worldMinY, worldMaxX, worldMaxY] = renderer.viewTransform.worldBounds;
     const divisions = 1 << level;
     const scale = 1 / divisions;
-    const minX = Math.max(0, Math.ceil(worldMinX * divisions) - 1);
-    const maxX = Math.min(divisions, Math.ceil(worldMaxX * divisions));
-    const minY = Math.max(0, Math.ceil(worldMinY * divisions) - 1);
-    const maxY = Math.min(divisions, Math.ceil(worldMaxY * divisions));
+    const minX = Math.max(0, Math.floor(worldMinX * divisions - 0.01));
+    const maxX = Math.min(divisions, Math.ceil(worldMaxX * divisions + 0.01));
+    const minY = Math.max(0, Math.floor(worldMinY * divisions - 0.01));
+    const maxY = Math.min(divisions, Math.ceil(worldMaxY * divisions + 0.01));
     return [minX, minY, maxX, maxY, divisions, scale];
   }
 
@@ -131,9 +144,9 @@ export class TileRenderer {
       this.preload(renderer, level - 1);
     }
 
-    const viewTileSize = renderer.viewScale / (1 << level);
+    const viewTileSize = renderer.transform.scale / (1 << level);
     const [minX, minY, maxX, maxY] = this.tileRange(renderer, level);
-    const [offX, offY] = renderer.worldToView(0, 0);
+    const [offX, offY] = renderer.transform.project(0, 0);
 
     // Render base geometry.
     for (let tx = minX; tx < maxX; ++tx) {

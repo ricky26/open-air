@@ -18,17 +18,17 @@ const routes = mount({
 
 function MainMapView() {
   const [transform, setTransform] = useState({
-    worldX: 0.49,
-    worldY: 0.32,
+    x: 0.49,
+    y: 0.32,
     zoom: 5,
     rotation: 0,
   });
 
-  const onTransform = useCallback(({ worldX, worldY, rotation, zoom }) => {
-    worldX = Math.min(1, Math.max(0, worldX));
-    worldY = Math.min(1, Math.max(0, worldY));
+  const onTransform = useCallback(({ x, y, rotation, zoom }) => {
+    x = Math.min(1, Math.max(0, x));
+    y = Math.min(1, Math.max(0, y));
     zoom = Math.min(20, Math.max(0, zoom));
-    setTransform({worldX, worldY, zoom, rotation});
+    setTransform({x, y, zoom, rotation});
   }, [setTransform]);
 
   const cache = Cache.default;
@@ -44,8 +44,8 @@ function MainMapView() {
   return (
     <Map
       render={render}
-      worldX={transform.worldX}
-      worldY={transform.worldY}
+      x={transform.x}
+      y={transform.y}
       zoom={transform.zoom}
       rotation={transform.rotation}
       onTransform={onTransform}

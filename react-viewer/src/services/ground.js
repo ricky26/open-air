@@ -1,8 +1,8 @@
 import {SectionRenderer} from "./tile";
-import {aabbIntersects} from "./coords";
-import {PALETTE, parseStyle} from "./palette";
+import {aabbIntersects, rectContains} from "./coords";
+import {PALETTE, parseStyle} from "./style";
 
-const TEXT_SCALE = 0.5;
+const TEXT_SCALE = 0.6;
 const FONT_FAMILY = 'Roboto';
 
 export class GroundRenderer extends SectionRenderer {
@@ -10,15 +10,9 @@ export class GroundRenderer extends SectionRenderer {
     super('ground-tile', cache, sections, size);
   }
 
-  _renderTile(canvas, ctx, level, x, y, section) {
-    const divisions = 1 << level;
-    const scale = 1 / divisions;
-    const minX = x * scale;
-    const minY = y * scale;
-    const maxX = minX + scale;
-    const maxY = minY + scale;
-    const sectionAabb = [minX, minY, maxX, maxY];
-    ctx.setTransform(this.size, 0, 0, this.size, 0, 0);
+  _renderTile(renderer, level, x, y, section) {
+    const {context, transform} = renderer;
+    const sectionAabb = renderer.viewTransform.worldBounds;
 
     for (const shape of section.shapes) {
       const strokeStyle = parseStyle(shape.strokeColour);
@@ -34,29 +28,28 @@ export class GroundRenderer extends SectionRenderer {
       }
 
       let first = true;
-      ctx.beginPath();
+      context.beginPath();
       for (const [px, py] of shape.mapPoints) {
-        const tx = (px - minX) * divisions;
-        const ty = (py - minY) * divisions;
+        const [tx, ty] = transform.project(px, py);
 
         if (first) {
-          ctx.moveTo(tx, ty);
+          context.moveTo(tx, ty);
           first = false;
         } else {
-          ctx.lineTo(tx, ty);
+          context.lineTo(tx, ty);
         }
       }
 
       if (strokeStyle) {
-        ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = shape.strokeWidth / this.size;
-        ctx.stroke();
+        context.strokeStyle = strokeStyle;
+        context.lineWidth = shape.strokeWidth;
+        context.stroke();
       }
 
       if (fillStyle) {
-        ctx.closePath();
-        ctx.fillStyle = fillStyle;
-        ctx.fill();
+        context.closePath();
+        context.fillStyle = fillStyle;
+        context.fill();
       }
     }
   }
@@ -67,20 +60,15 @@ export class LabelsRenderer extends SectionRenderer {
     super('labels', cache, sections, size);
   }
 
-  _renderTile(canvas, ctx, level, x, y, section) {
-    //const divisions = 1 << level;
-    //const scale = 1 / divisions;
-    //const minX = x * scale;
-    //const minY = y * scale;
-    //const maxX = minX + scale;
-    //const maxY = minY + scale;
-    ctx.setTransform(this.size, 0, 0, this.size, 0, 0);
-
-    ctx.moveTo(0, 0);
-    ctx.lineTo(1, 1);
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 0.001;
-    ctx.stroke();
+  _renderTile(renderer, level, x, y, section) {
+    const {context, transform} = renderer;
+    const viewAabb = renderer.viewTransform.viewBounds;
+    const safeViewAabb = [
+      viewAabb[0] - 100,
+      viewAabb[1] - 100,
+      viewAabb[2] + 100,
+      viewAabb[3] + 100,
+    ];
 
     for (const label of section.labels) {
       const fontSize = label.fontSize * TEXT_SCALE * (1.1 ** level);
@@ -88,14 +76,19 @@ export class LabelsRenderer extends SectionRenderer {
         continue;
       }
 
-      const font = `${fontSize}pt ${FONT_FAMILY}`;
-      ctx.font = font;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = PALETTE.AIRPORTLABEL;
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-      ctx.shadowBlur = 3;
-      ctx.fillText(label.text, 6, 6);
+      const [px, py] = transform.project(...label.mapPosition);
+      if (!rectContains(safeViewAabb, [px, py])) {
+        continue;
+      }
+
+      const font = `bold ${fontSize}pt ${FONT_FAMILY}`;
+      context.font = font;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillStyle = PALETTE.AIRPORTLABEL;
+      context.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      context.shadowBlur = 0.2
+      context.fillText(label.text, px, py);
     }
 
     for (const point of section.points) {
@@ -104,14 +97,19 @@ export class LabelsRenderer extends SectionRenderer {
         continue;
       }
 
+      const [px, py] = transform.project(...point.position);
+      if (!rectContains(safeViewAabb, [px, py])) {
+        continue;
+      }
+
       const font = `${fontSize}pt ${FONT_FAMILY}`;
-      ctx.font = font;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = PALETTE.FIXLABEL;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-      ctx.shadowBlur = 4;
-      ctx.fillText(point.name, 6, 6);
+      context.font = font;
+      context.textAlign = 'left';
+      context.textBaseline = 'top';
+      context.fillStyle = PALETTE.FIXLABEL;
+      context.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      context.shadowBlur = 0.2;
+      context.fillText(point.name, px, py);
     }
   }
 }

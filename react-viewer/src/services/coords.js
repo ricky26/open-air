@@ -1,20 +1,20 @@
 export const DEG2RAD = Math.PI / 180;
 export const RAD2DEG = 180 / Math.PI;
 
-export function boxToAABB(x, y, w, h, sinR, cosR) {
-  const x0 = -cosR * w + sinR * h;
-  const y0 = -sinR * w - cosR * h;
-  const x1 = +cosR * w + sinR * h;
-  const y1 = +sinR * w - cosR * h;
-  const x2 = -cosR * w - sinR * h;
-  const y2 = -sinR * w + cosR * h;
-  const x3 = +cosR * w - sinR * h;
-  const y3 = +sinR * w + cosR * h;
+export function boxToAABB([vx0, vy0, vx1, vy1], sin, cos) {
+  const x0 = cos * vx0 - sin * vy0;
+  const y0 = sin * vx0 + cos * vy0;
+  const x1 = cos * vx1 - sin * vy0;
+  const y1 = sin * vx1 + cos * vy0;
+  const x2 = cos * vx0 - sin * vy1;
+  const y2 = sin * vx0 + cos * vy1;
+  const x3 = cos * vx1 - sin * vy1;
+  const y3 = sin * vx1 + cos * vy1;
 
-  const minX = Math.min(x0, x1, x2, x3) * 0.5;
-  const minY = Math.min(y0, y1, y2, y3) * 0.5;
-  const maxX = Math.max(x0, x1, x2, x3) * 0.5;
-  const maxY = Math.max(y0, y1, y2, y3) * 0.5;
+  const minX = Math.min(x0, x1, x2, x3);
+  const minY = Math.min(y0, y1, y2, y3);
+  const maxX = Math.max(x0, x1, x2, x3);
+  const maxY = Math.max(y0, y1, y2, y3);
   const width = maxX - minX;
   const height = maxY - minY;
 
@@ -55,4 +55,8 @@ export function aabbIntersects(a, b) {
   const height = 0.5 * (ah + bh);
 
   return (distX < width) && (distY < height);
+}
+
+export function rectContains([x0, y0, x1, y1], [x, y]) {
+  return (x0 <= x) && (x <= x1) && (y0 <= y) && (y <= y1);
 }
