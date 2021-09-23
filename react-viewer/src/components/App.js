@@ -8,6 +8,9 @@ import './App.css';
 import {GroundRenderer, LabelsRenderer} from "../services/ground";
 import {Cache} from "../services/cache";
 import {SectionSource} from "../services/sectionData";
+import {Whazzup} from "../services/whazzup";
+import {PilotRenderer} from "../services/pilots";
+import {Airlines} from "../services/airlines";
 
 const routes = mount({
   '/': route({
@@ -24,7 +27,7 @@ function MainMapView() {
     rotation: 0,
   });
 
-  const onTransform = useCallback(({ x, y, rotation, zoom }) => {
+  const onTransform = useCallback(({x, y, rotation, zoom}) => {
     x = Math.min(1, Math.max(0, x));
     y = Math.min(1, Math.max(0, y));
     zoom = Math.min(20, Math.max(0, zoom));
@@ -33,13 +36,17 @@ function MainMapView() {
 
   const cache = Cache.default;
   const sections = SectionSource.default;
+  const whazzup = Whazzup.default;
+  const airlines = Airlines.default;
 
   const groundTiles = useMemo(() => new GroundRenderer(cache, sections, 1024), [cache, sections]);
   const groundLabels = useMemo(() => new LabelsRenderer(cache, sections, 1024), [cache, sections]);
+  const pilots = useMemo(() => new PilotRenderer(whazzup, airlines), [whazzup, airlines]);
   const render = useCallback(renderer => {
     groundTiles.draw(renderer);
     groundLabels.draw(renderer);
-  }, [groundTiles, groundLabels]);
+    pilots.draw(renderer);
+  }, [groundTiles, groundLabels, pilots]);
 
   return (
     <Map

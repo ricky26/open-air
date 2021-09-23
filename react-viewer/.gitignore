@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /public/sections
+/public/airlines.json
 /.pnp
 .pnp.js
 

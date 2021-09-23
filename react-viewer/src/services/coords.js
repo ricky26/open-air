@@ -61,3 +61,12 @@ export function rectIntersects(a, b) {
 export function rectContains([x0, y0, x1, y1], [x, y]) {
   return (x0 <= x) && (x <= x1) && (y0 <= y) && (y <= y1);
 }
+
+export function geo2map(latitude, longitude) {
+  const {PI} = Math;
+  const x = (longitude + 180) / 360;
+  const y = (PI - Math.log(Math.tan((PI / 4) + (latitude * DEG2RAD / 2))))
+    / (2 * PI);
+  return [x, y];
+}
+

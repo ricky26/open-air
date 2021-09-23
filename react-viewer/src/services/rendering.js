@@ -69,6 +69,7 @@ export class ViewTransform {
     this._viewBounds = Object.freeze([0, 0, 0, 0]);
     this._worldBounds = Object.freeze([0, 0, 0, 0]);
     this._viewRect = Object.freeze([0, 0, 0, 0]);
+    this.viewMinor = 0;
     this.viewWidth = 0;
     this.viewHeight = 0;
     this.worldWidth = 0;
@@ -102,6 +103,9 @@ export class ViewTransform {
   }
 
   updateBounds() {
+    const [viewX0, viewY0, viewX1, viewY1] = this.viewRect;
+    this.viewMinor = Math.min(Math.abs(viewX0 - viewX1), Math.abs(viewY0 - viewY1));
+
     const {x, y, invScale, sin, cos} = this.transform;
     const [ viewWidth, viewHeight, ...bounds ] = boxToAABB(this.viewRect, sin, cos);
     this.viewWidth = viewWidth;
