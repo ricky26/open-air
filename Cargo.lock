@@ -150,22 +150,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
-name = "ivao-interop"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "approx",
- "clap",
- "env_logger",
- "log",
- "open-air",
- "pathdiff",
- "relative-path",
- "serde_json",
- "walkdir",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -207,6 +191,22 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "open-air-ivao"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "approx",
+ "clap",
+ "env_logger",
+ "log",
+ "open-air",
+ "pathdiff",
+ "relative-path",
+ "serde_json",
+ "walkdir",
 ]
 
 [[package]]

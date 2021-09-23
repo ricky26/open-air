@@ -1,5 +1,5 @@
 [package]
-name = "ivao-interop"
+name = "open-air-ivao"
 description = "A library for interacting with IVAO-specific interchange formats"
 version = "0.1.0"
 edition = "2021"
