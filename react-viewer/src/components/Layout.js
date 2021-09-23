@@ -1,4 +1,4 @@
-import {AppBar, IconButton, Toolbar, Typography} from "@mui/material";
+import {AppBar, Box, Icon, IconButton, Toolbar, Typography} from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 
 export default function Layout({children}) {
@@ -12,6 +12,10 @@ export default function Layout({children}) {
           <Typography variant="h6" color="inherit" component="div">
             Open Air
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton href="https://github.com/ricky26/open-air">
+            <img src="/images/github-light-64px.png" width="24px" height="24px"/>
+          </IconButton>
         </Toolbar>
       </AppBar>
       <main>{children}</main>
