@@ -1,6 +1,8 @@
 [package]
 name = "open-air-ivao"
 description = "A library for interacting with IVAO-specific interchange formats"
+authors = ["Erica Taylor <rickytaylor26@gmail.com>"]
+license = "BSD"
 version = "0.1.0"
 edition = "2021"
 
