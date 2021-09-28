@@ -1,5 +1,5 @@
 import {DEG2RAD, rectContains} from "./coords";
-import {DEFAULT_PALETTE} from "./style";
+import {styleStroke} from "./style";
 
 function rotatePoint(x, y, sin, cos) {
   return [x * cos - y * sin, x * sin + y * cos];
@@ -53,11 +53,12 @@ export class PilotRenderer {
       context.lineWidth = 2;
 
       // Projected speed line
-      context.strokeStyle = DEFAULT_PALETTE.RUNWAYCENTER;
-      context.beginPath();
-      context.moveTo(...pos);
-      context.lineTo(...addPoints(pos, rotatePoint(0, -1e-7 * groundSpeed * scale, sin, cos)));
-      context.stroke();
+      styleStroke(context, style, 'RUNWAYCENTER', () => {
+        context.beginPath();
+        context.moveTo(...pos);
+        context.lineTo(...addPoints(pos, rotatePoint(0, -1e-7 * groundSpeed * scale, sin, cos)));
+        context.stroke();
+      });
 
       // Blip
       context.beginPath();

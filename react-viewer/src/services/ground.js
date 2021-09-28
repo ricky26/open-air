@@ -54,7 +54,6 @@ export class GroundRenderer extends SectionRenderer {
         }
 
         styleStroke(context, style, 'RUNWAYCENTER', () => {
-          context.strokeStyle = DEFAULT_PALETTE.RUNWAYCENTER;
           context.setLineDash([10, 10]);
 
           const pa = transform.project(...a);
