@@ -14,6 +14,15 @@ function calculateTransform(transform, canvas) {
   });
 }
 
+function translateEventXY(event, x, y) {
+  const {left, top} = event.target.getBoundingClientRect();
+  return [x - left, y - top];
+}
+
+function getMouseXY(event) {
+  return translateEventXY(event, event.clientX, event.clientY);
+}
+
 export default function Map(props) {
   const {
     zoom = 1,
@@ -132,6 +141,7 @@ export default function Map(props) {
   const handleWheel = useCallback(event => {
     const zoomDelta = event.deltaY * 0.01;
     const zoom = Math.max(0, transform.current.zoom - zoomDelta);
+    const [mouseX, mouseY] = getMouseXY(event);
 
     const newTransformValue = {
       ...transform.current,
@@ -143,13 +153,13 @@ export default function Map(props) {
 
     // Reposition so the cursor is over the same position it was before.
     const dpiScale = window.devicePixelRatio || 1;
-    const viewX = (event.clientX - canvas.current.clientWidth * 0.5) * dpiScale;
-    const viewY = (event.clientY - canvas.current.clientHeight * 0.5) * dpiScale;
-    const [x1, y1] = oldTransform.unproject(viewX, viewY);
-    const [x2, y2] = newTransform.unproject(viewX, viewY);
+    const viewX = (mouseX - canvas.current.clientWidth * 0.5) * dpiScale;
+    const viewY = (mouseY - canvas.current.clientHeight * 0.5) * dpiScale;
+
+    const [x1, y1] = oldTransform.unprojectVector(viewX, viewY);
+    const [x2, y2] = newTransform.unprojectVector(viewX, viewY);
     const dx = x1 - x2;
     const dy = y1 - y2;
-
     newTransformValue.x += dx;
     newTransformValue.y += dy;
 

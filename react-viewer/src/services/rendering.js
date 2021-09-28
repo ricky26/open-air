@@ -40,10 +40,10 @@ export class Transform {
     return {x, y, scale, rotation};
   }
 
-  project(x, y) {
-    const {scale, cos, sin, x: x0, y: y0} = this;
-    const flatX = (x - x0) * scale;
-    const flatY = (y - y0) * scale;
+  projectVector(x, y) {
+    const {scale, cos, sin} = this;
+    const flatX = x * scale;
+    const flatY = y * scale;
 
     const viewX = cos * flatX - sin * flatY;
     const viewY = sin * flatX + cos * flatY;
@@ -51,15 +51,26 @@ export class Transform {
     return [viewX, viewY];
   }
 
-  unproject(x, y) {
-    const {invScale, cos, sin, x: x0, y: y0} = this;
-    const flatX = cos * x + sin * y;
-    const flatY = cos * y - sin * y;
+  project(x, y) {
+    const {x: x0, y: y0} = this;
+    return this.projectVector(x - x0, y - y0);
+  }
 
-    const tx = x0 + flatX * invScale;
-    const ty = y0 + flatY * invScale;
+  unprojectVector(x, y) {
+    const {invScale, cos, sin} = this;
+    const flatX = cos * x + sin * y;
+    const flatY = cos * y - sin * x;
+
+    const tx = flatX * invScale;
+    const ty = flatY * invScale;
 
     return [tx, ty];
+  }
+
+  unproject(x, y) {
+    const {x: x0, y: y0} = this;
+    const [tx, ty] = this.unprojectVector(x, y);
+    return [tx + x0, ty + y0];
   }
 }
 
@@ -107,7 +118,7 @@ export class ViewTransform {
     this.viewMinor = Math.min(Math.abs(viewX0 - viewX1), Math.abs(viewY0 - viewY1));
 
     const {x, y, invScale, sin, cos} = this.transform;
-    const [ viewWidth, viewHeight, ...bounds ] = boxToAABB(this.viewRect, sin, cos);
+    const [viewWidth, viewHeight, ...bounds] = boxToAABB(this.viewRect, sin, cos);
     this.viewWidth = viewWidth;
     this.viewHeight = viewHeight;
     const viewMinX = Math.floor(bounds[0]);
