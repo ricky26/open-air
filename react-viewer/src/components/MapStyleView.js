@@ -1,9 +1,9 @@
+import {useCallback, useState} from "react";
 import {Container, Dialog, Divider, IconButton, List, ListItem, ListItemIcon, ListItemText, Paper} from "@mui/material";
 import {Visibility, VisibilityOff} from "@mui/icons-material";
 import {DEFAULT_LAYERS, DEFAULT_PALETTE} from "../services/style";
-import {useCallback, useState} from "react";
-import "./MapStyleView.css";
 import ColourPicker from "./ColourPicker";
+import "./MapStyleView.css";
 
 function hasProp(v, k) {
   return Object.prototype.hasOwnProperty.call(v, k);
@@ -124,8 +124,9 @@ export default function MapStyleView(props) {
         <ConfigSwatch name="Prohibited Area" configKey="PROHIBIT" {...configKeys} />
         <ConfigSwatch name="Restricted Area" configKey="RESTRICT" {...configKeys} />
       </ConfigSection>
-      <Divider/>
+      <Divider style={{ width: '100%' }}/>
       <ConfigSection name="Labels" layer="LABELS" {...configKeys}/>
+      <Divider style={{ width: '100%' }}/>
       <ConfigSection name="Pilots" layer="PILOTS" {...configKeys}/>
     </Container>
   );
