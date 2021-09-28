@@ -15,7 +15,7 @@ pub enum FixKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(rename_all = "lowercase", tag = "type")]
 pub enum PointKind {
     FIX { kind: FixKind, is_boundary: bool },
     VOR { frequency: u16 },
