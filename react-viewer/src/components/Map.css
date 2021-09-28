@@ -1,8 +1,15 @@
 .Map {
-    height: 100vh;
-    width: 100vw;
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: relative;
+    overflow: hidden;
     background: black;
+}
+
+.Map > canvas, .Map > div {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+.Map > div {
+    pointer-events: none;
 }

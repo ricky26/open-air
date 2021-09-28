@@ -19,9 +19,11 @@ export default function Map(props) {
     y = 0,
     rotation = 0,
     onTransform = null,
+    className = '',
+    containerClassName = '',
     render,
+    children,
   } = props;
-
   const canvas = useRef();
   const transform = useRef();
   transform.current = {x, y, rotation, zoom};
@@ -39,7 +41,7 @@ export default function Map(props) {
         canvas.current.width = width;
         canvas.current.height = height;
 
-        renderer.viewTransform.viewRect = [-width/2, -height/2, width/2, height/2];
+        renderer.viewTransform.viewRect = [-width / 2, -height / 2, width / 2, height / 2];
         renderer.viewTransform.transform = calculateTransform(transform, canvas);
         renderer.render(() => {
           renderer.context.clearRect(...renderer.viewTransform.viewBounds);
@@ -138,13 +140,17 @@ export default function Map(props) {
   }, [onTransform, transform, canvas]);
 
   return (
-    <canvas
-      className={"Map"}
-      ref={canvas}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
-    />
+    <div className={`Map ${className}`}>
+      <canvas
+        className={`Map ${className}`}
+        ref={canvas}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onWheel={handleWheel}/>
+      <div className={containerClassName}>
+        {children}
+      </div>
+    </div>
   );
 }

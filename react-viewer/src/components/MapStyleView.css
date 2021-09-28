@@ -1,0 +1,17 @@
+.MapStyleView-section-header {
+    display: block;
+    padding-top: 12px;
+}
+
+.MapStyleView-section {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 8px;
+}
+
+.MapStyleView-swatch {
+    display: inline-block;
+    min-width: 300px;
+    flex-basis: 25%;
+    overflow: hidden;
+}

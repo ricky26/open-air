@@ -13,19 +13,19 @@ export class TileRenderer {
     this.brokenTiles = new Set();
   }
 
-  _key(level, x, y) {
-    return `${this.prefix}:${this.size}:${level}:${x}:${y}`;
+  _key(style, level, x, y, key) {
+    return `${this.prefix}:${key || style.keys[0]}:${this.size}:${level}:${x}:${y}`;
   }
 
   _tileData(level, x, y) {
     return null;
   }
 
-  _renderTile(renderer, level, x, y) {
+  _renderTile(renderer, style, level, x, y) {
   }
 
-  renderTile(level, x, y) {
-    const key = this._key(level, x, y);
+  renderTile(style, level, x, y) {
+    const key = this._key(style, level, x, y);
     const existing = this.cache.use(key);
     if (existing !== null) {
       return existing;
@@ -71,24 +71,30 @@ export class TileRenderer {
           rotation: 0,
         });
         renderer.viewTransform.viewRect = [0, 0, this.size, this.size];
-        renderer.render(() => this._renderTile(renderer, level, x, y, data));
+        renderer.render(() => this._renderTile(renderer, style, level, x, y, data));
         return {canvas};
       },
       free: freeCanvas,
     });
   }
 
-  drawTile(renderer, level, x, y, dx, dy, dw, dh) {
-    let entry = this.renderTile(level, x, y);
+  drawTile(renderer, style, level, x, y, dx, dy, dw, dh) {
+    let entry = this.renderTile(style, level, x, y);
     let drawLevel = level;
 
+    // Check old style versions
+    for (let versionIdx = 1; (entry === null) && (versionIdx < style.keys.length); ++versionIdx) {
+      const key = this._key(style, level, x, y, style.keys[versionIdx]);
+      entry = this.cache.use(key);
+    }
+
+    // Check lower levels
     while ((entry === null) && (drawLevel > 0)) {
-      // It's not ready yet, check lower levels.
       drawLevel--;
 
       const drawTileX = x >> (level - drawLevel);
       const drawTileY = y >> (level - drawLevel);
-      const key = this._key(drawLevel, drawTileX, drawTileY);
+      const key = this._key(style, drawLevel, drawTileX, drawTileY);
       entry = this.cache.use(key);
     }
 
@@ -123,25 +129,25 @@ export class TileRenderer {
     return [minX, minY, maxX, maxY, divisions, scale];
   }
 
-  preload(renderer, level) {
+  preload(renderer, style, level) {
     const [minX, minY, maxX, maxY] = this.tileRange(renderer, level);
 
     for (let x = minX; x < maxX; ++x) {
       for (let y = minY; y < maxY; ++y) {
-        this.renderTile(level, x, y);
+        this.renderTile(style, level, x, y);
       }
     }
   }
 
-  draw(renderer) {
+  draw(renderer, style) {
     const level = renderer.levelForSize(this.size);
 
     if (level > 1) {
-      this.preload(renderer, level - 2);
+      this.preload(renderer, style, level - 2);
     }
 
     if (level > 0) {
-      this.preload(renderer, level - 1);
+      this.preload(renderer, style, level - 1);
     }
 
     const viewTileSize = renderer.transform.scale / (1 << level);
@@ -151,7 +157,9 @@ export class TileRenderer {
     // Render base geometry.
     for (let tx = minX; tx < maxX; ++tx) {
       for (let ty = minY; ty < maxY; ++ty) {
-        this.drawTile(renderer, level, tx, ty, offX + tx * viewTileSize, offY + ty * viewTileSize, viewTileSize, viewTileSize);
+        this.drawTile(renderer, style, level,
+          tx, ty, offX + tx * viewTileSize, offY + ty * viewTileSize,
+          viewTileSize, viewTileSize);
       }
     }
   }
