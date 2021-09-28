@@ -55,6 +55,9 @@ export const DEFAULT_LAYERS = {
   GROUND: true,
   LABELS: true,
   PILOTS: true,
+  VOR: true,
+  NDB: true,
+  FIX: true,
 
   COAST: true,
   PIER: true,
