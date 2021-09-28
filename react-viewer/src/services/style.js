@@ -1,4 +1,5 @@
 import {useMemo, useRef} from "react";
+import {number2rgb} from "./colour";
 
 const DEFAULT_FONT = 'Roboto';
 
@@ -53,6 +54,7 @@ export const DEFAULT_LAYERS = {
   RUNWAYS: true,
   GROUND: true,
   LABELS: true,
+  PILOTS: true,
 
   COAST: true,
   PIER: true,
@@ -70,26 +72,9 @@ export const DEFAULT_LAYERS = {
   FIXLABEL: true,
 };
 
-export function hsv2rgb(h, s, v, a = 1) {
-  let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
-  return [f(5), f(3), f(1), a];
-}
-
-export function rgbToStr(r, g, b, a = 1) {
-  const rs = Math.floor(r * 255).toFixed();
-  const gs = Math.floor(g * 255).toFixed();
-  const bs = Math.floor(b * 255).toFixed();
-  return `rgba(${rs},${gs},${bs},${a})`;
-}
-
-function rgbFromNumber(value) {
-  const s = '000000' + value.toString(16);
-  return `#${s.substring(s.length - 6)}`;
-}
-
 export function styleStroke(ctx, style, name, f) {
   if (typeof name === 'number') {
-    ctx.strokeStyle = rgbFromNumber(name);
+    ctx.strokeStyle = number2rgb(name);
     f();
     return true;
   }
@@ -99,7 +84,7 @@ export function styleStroke(ctx, style, name, f) {
 
 export function styleFill(ctx, style, name, f) {
   if (typeof name === 'number') {
-    ctx.fillStyle = rgbFromNumber(name);
+    ctx.fillStyle = number2rgb(name);
     f();
     return true;
   }

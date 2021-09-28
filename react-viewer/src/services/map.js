@@ -59,6 +59,19 @@ function reduceMapConfig(prevState, action) {
   let newState = prevState;
 
   switch (action.type) {
+    case 'colour':
+      newState = {
+        ...newState,
+        config: {
+          ...newState.config,
+          palette: {
+            ...newState.config.palette,
+            [action.key]: action.value,
+          },
+        },
+      };
+      break;
+
     case 'layer-visibility':
       newState = {
         ...newState,
@@ -102,6 +115,7 @@ function reduceMapConfig(prevState, action) {
 export function useMapConfig() {
   const [state, dispatch] = useReducer(reduceMapConfig, null, loadMapConfig);
   const dispatcher = useMemo(() => ({
+    setColour: (key, value) => dispatch({type: 'colour', key, value}),
     setLayerVisible: (layer, visible) => dispatch({type: 'layer-visibility', layer, visible}),
   }), [dispatch]);
   return [state, dispatcher];

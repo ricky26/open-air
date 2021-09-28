@@ -1,8 +1,9 @@
-import {Container, Divider, IconButton, List, ListItem, ListItemIcon, ListItemText, Paper} from "@mui/material";
+import {Container, Dialog, Divider, IconButton, List, ListItem, ListItemIcon, ListItemText, Paper} from "@mui/material";
 import {Visibility, VisibilityOff} from "@mui/icons-material";
 import {DEFAULT_LAYERS, DEFAULT_PALETTE} from "../services/style";
-import {useCallback} from "react";
+import {useCallback, useState} from "react";
 import "./MapStyleView.css";
+import ColourPicker from "./ColourPicker";
 
 function hasProp(v, k) {
   return Object.prototype.hasOwnProperty.call(v, k);
@@ -49,7 +50,7 @@ function ConfigSection({name, layer, children, mapConfig, mapConfigDispatcher}) 
   );
 }
 
-function Swatch({name, value, visible, setVisible}) {
+function Swatch({name, value, visible, setVisible, onClick}) {
   const visibilityIcon = (visible !== null) ? (
     visible ? <Visibility/> : <VisibilityOff/>
   ) : null;
@@ -57,7 +58,7 @@ function Swatch({name, value, visible, setVisible}) {
   return (
     <ListItem className="MapStyleView-swatch">
       <ListItemIcon sx={{minWidth: 48}}>
-        <Paper style={{backgroundColor: value, width: 24, height: 24}}/>
+        <Paper onClick={onClick} style={{backgroundColor: value, width: 24, height: 24}}/>
       </ListItemIcon>
       <ListItemText primary={name}/>
       <IconButton
@@ -75,14 +76,26 @@ function ConfigSwatch({mapConfig, mapConfigDispatcher, name, configKey}) {
   const setVisible = useCallback(v => {
     mapConfigDispatcher.setLayerVisible(configKey, v);
   }, [configKey, mapConfigDispatcher]);
+  const [editingValue, setEditingValue] = useState(false);
+
+  const applyColour = () => {
+    mapConfigDispatcher.setColour(configKey, editingValue);
+    setEditingValue(null);
+  };
 
   return (
-    <Swatch
-      name={name}
-      value={colour}
-      visible={isVisible}
-      setVisible={setVisible}
-    />
+    <>
+      <Swatch
+        name={name}
+        value={colour}
+        visible={isVisible}
+        setVisible={setVisible}
+        onClick={() => setEditingValue(colour)}
+      />
+      <Dialog open={!!editingValue} onClose={applyColour}>
+        <ColourPicker value={editingValue || '#ffffff'} setValue={setEditingValue}/>
+      </Dialog>
+    </>
   );
 }
 
@@ -112,8 +125,8 @@ export default function MapStyleView(props) {
         <ConfigSwatch name="Restricted Area" configKey="RESTRICT" {...configKeys} />
       </ConfigSection>
       <Divider/>
-      <ConfigSection name="Labels" layer="LABELS" {...configKeys}>
-      </ConfigSection>
+      <ConfigSection name="Labels" layer="LABELS" {...configKeys}/>
+      <ConfigSection name="Pilots" layer="PILOTS" {...configKeys}/>
     </Container>
   );
 }

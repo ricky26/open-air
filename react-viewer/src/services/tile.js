@@ -1,5 +1,5 @@
 import {createCanvas, freeCanvas, Renderer, Transform} from "./rendering";
-import {hsv2rgb, rgbToStr} from "./style";
+import {hsv2rgb, rgb2str} from "./colour";
 
 const DEBUG_TILES = false;
 
@@ -54,7 +54,7 @@ export class TileRenderer {
         canvas.height = this.size;
 
         if (DEBUG_TILES) {
-          ctx.fillStyle = rgbToStr.apply(null, hsv2rgb(Math.random() * 360, 1, 1, 0.07));
+          ctx.fillStyle = rgb2str.apply(null, hsv2rgb(Math.random() * 360, 1, 1, 0.07));
           ctx.fillRect(0, 0, this.size, this.size);
         }
 
@@ -156,20 +156,30 @@ export class TileRenderer {
 
     // Render tiles.
     const {context, transform} = renderer
-    const {cos, sin} = transform;
+    const {cos, sin, rotation} = transform;
 
-    context.save();
-    context.transform(cos, sin, -sin, cos, offX, offY);
-    for (let tx = minX; tx < maxX; ++tx) {
-      for (let ty = minY; ty < maxY; ++ty) {
-        const dx = tx * viewTileSize;
-        const dy = ty * viewTileSize;
-        const dw = (tx + 1) * viewTileSize - dx + Number.EPSILON;
-        const dh = (ty + 1) * viewTileSize - dy + Number.EPSILON;
-        this.drawTile(renderer, style, level, tx, ty, dx, dy, dw, dh);
+    if (!rotation) {
+      for (let tx = minX; tx < maxX; ++tx) {
+        for (let ty = minY; ty < maxY; ++ty) {
+          const dx = offX + tx * viewTileSize;
+          const dy = offY + ty * viewTileSize;
+          this.drawTile(renderer, style, level, tx, ty, dx, dy, viewTileSize, viewTileSize);
+        }
       }
+    } else {
+      context.save();
+      context.transform(cos, sin, -sin, cos, offX, offY);
+      for (let tx = minX; tx < maxX; ++tx) {
+        for (let ty = minY; ty < maxY; ++ty) {
+          const dx = tx * viewTileSize;
+          const dy = ty * viewTileSize;
+          const dw = (tx + 1) * viewTileSize - dx + 0.5;
+          const dh = (ty + 1) * viewTileSize - dy + 0.5;
+          this.drawTile(renderer, style, level, tx, ty, dx, dy, dw, dh);
+        }
+      }
+      context.restore();
     }
-    context.restore();
   }
 }
 

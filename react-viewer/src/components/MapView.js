@@ -32,7 +32,6 @@ function MapContainer(props) {
     storeTransform({x, y, zoom, rotation});
   }, [setTransform, storeTransform]);
 
-
   const cache = Cache.default;
   const sections = SectionSource.default;
   const whazzup = Whazzup.default;
@@ -43,9 +42,9 @@ function MapContainer(props) {
   const pilots = useMemo(() => new PilotRenderer(whazzup, airlines), [whazzup, airlines]);
 
   const render = useCallback(renderer => {
-    style.showLayer('GROUND') && groundTiles.draw(renderer, style);
-    style.showLayer('LABELS') && groundLabels.draw(renderer, style);
-    pilots.draw(renderer, style);
+    style.showLayer("GROUND") && groundTiles.draw(renderer, style);
+    style.showLayer("LABELS") && groundLabels.draw(renderer, style);
+    style.showLayer("PILOTS") && pilots.draw(renderer, style);
   }, [style, groundTiles, groundLabels, pilots]);
 
   return (
