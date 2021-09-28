@@ -39,7 +39,6 @@ export class PilotRenderer {
         continue;
       }
 
-      const airline = this.airlines.byCallsign(pilot.callsign);
       const lineHeight = 20 * devicePixelRatio;
       const fontSize = Math.trunc(lineHeight * 0.8);
       const angle = heading * DEG2RAD;
@@ -74,6 +73,8 @@ export class PilotRenderer {
       if (viewScale < 15) {
         continue;
       }
+
+      const airline = this.airlines.byCallsign(pilot.callsign);
 
       let x = pos[0] + 5;
       let y = pos[1] + 5;
