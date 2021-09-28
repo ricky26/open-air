@@ -40,7 +40,7 @@ export class PilotRenderer {
       }
 
       const airline = this.airlines.byCallsign(pilot.callsign);
-      const lineHeight = 20;
+      const lineHeight = 20 * devicePixelRatio;
       const fontSize = Math.trunc(lineHeight * 0.8);
       const angle = heading * DEG2RAD;
       const sin = Math.sin(angle);

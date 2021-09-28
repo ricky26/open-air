@@ -2,14 +2,18 @@
     position: relative;
     overflow: hidden;
     background: black;
+    touch-action: none;
 }
 
 .Map > canvas, .Map > div {
     position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
     height: 100%;
 }
 
 .Map > div {
     pointer-events: none;
+    touch-action: none;
 }

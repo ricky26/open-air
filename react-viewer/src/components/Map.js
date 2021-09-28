@@ -1,5 +1,7 @@
 import {useCallback, useEffect, useRef} from "react";
+import Hammer from "hammerjs";
 import {Renderer, Transform} from "../services/rendering";
+import {DEG2RAD} from "../services/coords";
 import "./Map.css";
 
 function calculateTransform(transform, canvas) {
@@ -8,7 +10,7 @@ function calculateTransform(transform, canvas) {
   const baseSize = Math.min(width, height);
   const scale = (2 ** zoom) * baseSize;
   return Transform.from({
-    x, y, scale, rotation,
+    x, y, scale, rotation: rotation * DEG2RAD,
   });
 }
 
@@ -61,9 +63,49 @@ export default function Map(props) {
   });
 
   // Input handling
-  const mouseState = useRef({
+  const dragState = useRef({
     active: false,
   });
+
+  const startDrag = useCallback((clientX, clientY, rotation = 0, zoom = 0) => {
+    dragState.current.active = true;
+    dragState.current.startMouseX = clientX;
+    dragState.current.startMouseY = clientY;
+    dragState.current.startMouseRotation = rotation;
+    dragState.current.startMouseZoom = zoom;
+    dragState.current.startX = transform.current.x;
+    dragState.current.startY = transform.current.y;
+    dragState.current.startRotation = transform.current.rotation;
+    dragState.current.startZoom = transform.current.zoom;
+  }, [dragState, transform]);
+
+  const updateDrag = useCallback((clientX, clientY, rotation = 0, zoom = 0) => {
+    if (!dragState.current.active) {
+      return;
+    }
+
+    const t = calculateTransform(transform, canvas);
+    const {scale, sin, cos} = t;
+    const dmx = (dragState.current.startMouseX - clientX) * devicePixelRatio;
+    const dmy = (dragState.current.startMouseY - clientY) * devicePixelRatio;
+
+    const dmmx = cos * dmx + sin * dmy;
+    const dmmy = - sin * dmx + cos * dmy;
+
+    const x = dragState.current.startX + dmmx / scale;
+    const y = dragState.current.startY + dmmy / scale;
+    rotation = rotation - dragState.current.startMouseRotation + dragState.current.startRotation;
+    zoom = zoom - dragState.current.startMouseZoom + dragState.current.startZoom;
+
+    if (onTransform) {
+      onTransform({x, y, rotation, zoom});
+    }
+  }, [canvas, dragState, transform, onTransform]);
+
+  const endDrag = useCallback((clientX, clientY, rotation, zoom) => {
+    updateDrag(clientX, clientY, rotation, zoom);
+    dragState.current.active = false;
+  }, [dragState, updateDrag])
 
   const handleMouseDown = useCallback(event => {
     if (event.button !== 0) {
@@ -71,44 +113,21 @@ export default function Map(props) {
       return;
     }
 
-    mouseState.current.active = true;
-    mouseState.current.startMouseX = event.clientX;
-    mouseState.current.startMouseY = event.clientY;
-    mouseState.current.startX = transform.current.x;
-    mouseState.current.startY = transform.current.y;
-  }, [mouseState, transform]);
-
-  const updateMouseDrag = useCallback(event => {
-    const t = calculateTransform(transform, canvas);
-    const {scale} = t;
-    const dmx = mouseState.current.startMouseX - event.clientX;
-    const dmy = mouseState.current.startMouseY - event.clientY;
-
-    const x = mouseState.current.startX + dmx / scale;
-    const y = mouseState.current.startY + dmy / scale;
-
-    if (onTransform) {
-      onTransform({...transform.current, x, y});
-    }
-  }, [onTransform, mouseState, transform, canvas]);
+    startDrag(event.clientX, event.clientY);
+  }, [startDrag]);
 
   const handleMouseMove = useCallback(event => {
-    if (!mouseState.current.active) {
-      return;
-    }
-
-    updateMouseDrag(event);
-  }, [mouseState, updateMouseDrag]);
+    updateDrag(event.clientX, event.clientY);
+  }, [updateDrag]);
 
   const handleMouseUp = useCallback(event => {
-    if (event.button !== 0 || !mouseState.current.active) {
+    if (event.button !== 0 || !dragState.current.active) {
       // We only use left-click for navigation as it stands.
       return;
     }
 
-    updateMouseDrag(event);
-    mouseState.current.active = false;
-  }, [mouseState, updateMouseDrag])
+    endDrag(event.clientX, event.clientY);
+  }, [endDrag])
 
   const handleWheel = useCallback(event => {
     const zoomDelta = event.deltaY * 0.01;
@@ -139,15 +158,35 @@ export default function Map(props) {
     }
   }, [onTransform, transform, canvas]);
 
+  useEffect(() => {
+    const mc = new Hammer(canvas.current);
+    mc.get("pinch").set({enable: true});
+    mc.get("rotate").set({enable: true});
+
+    mc.on("panstart pinchstart rotatestart", event => {
+      startDrag(event.center.x, event.center.y, event.rotation, Math.log2(event.scale));
+    });
+
+    mc.on("panmove pinchmove rotatemove", event => {
+      updateDrag(event.center.x, event.center.y, event.rotation, Math.log2(event.scale));
+    });
+
+    mc.on("panend pinchend rotateend", event => {
+      endDrag(event.center.x, event.center.y, event.rotation, Math.log2(event.scale));
+    });
+
+    return () => mc.destroy();
+  }, [canvas, startDrag, updateDrag, endDrag]);
+
   return (
     <div className={`Map ${className}`}>
       <canvas
-        className={`Map ${className}`}
         ref={canvas}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onWheel={handleWheel}/>
+        onWheel={handleWheel}
+      />
       <div className={containerClassName}>
         {children}
       </div>

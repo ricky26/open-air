@@ -144,12 +144,15 @@ export class Renderer {
   }
 
   render(handler) {
-    const {context} = this;
-    const [x0, y0] = this.viewTransform.viewRect;
-    const {sin, cos} = this.transform;
+    const {context, canvas} = this;
+    const [x0, y0, x1, y1] = this.viewTransform.viewRect;
+    const width = x1 - x0;
+    const height = y1 - y0;
+    const m00 = width / canvas.width;
+    const m11 = height / canvas.height;
 
     this.context.save();
-    context.setTransform(cos, -sin, sin, cos, -x0, -y0);
+    context.setTransform(m00, 0, 0, m11, -x0, -y0);
 
     try {
       handler(this);

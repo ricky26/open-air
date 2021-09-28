@@ -154,14 +154,22 @@ export class TileRenderer {
     const [minX, minY, maxX, maxY] = this.tileRange(renderer, level);
     const [offX, offY] = renderer.transform.project(0, 0);
 
-    // Render base geometry.
+    // Render tiles.
+    const {context, transform} = renderer
+    const {cos, sin} = transform;
+
+    context.save();
+    context.transform(cos, sin, -sin, cos, offX, offY);
     for (let tx = minX; tx < maxX; ++tx) {
       for (let ty = minY; ty < maxY; ++ty) {
-        this.drawTile(renderer, style, level,
-          tx, ty, offX + tx * viewTileSize, offY + ty * viewTileSize,
-          viewTileSize, viewTileSize);
+        const dx = tx * viewTileSize;
+        const dy = ty * viewTileSize;
+        const dw = (tx + 1) * viewTileSize - dx + Number.EPSILON;
+        const dh = (ty + 1) * viewTileSize - dy + Number.EPSILON;
+        this.drawTile(renderer, style, level, tx, ty, dx, dy, dw, dh);
       }
     }
+    context.restore();
   }
 }
 

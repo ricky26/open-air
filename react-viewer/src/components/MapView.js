@@ -13,6 +13,7 @@ import {useMapStyle} from "../services/style";
 import Map from "./Map";
 import './App.css';
 import MapStyleView from "./MapStyleView";
+import {MoreHoriz} from "@mui/icons-material";
 
 function MapContainer(props) {
   const {
@@ -80,11 +81,11 @@ export default function MapView({initialTransform, setTransform}) {
         <SpeedDial
           ariaLabel="style settings"
           hidden={showStyleDrawer}
-          icon={<SpeedDialIcon/>}
+          icon={<SpeedDialIcon icon={<SettingsIcon/>}/>}
           direction="up"
           sx={{position: "absolute", right: 12, bottom: 12}}>
           <SpeedDialAction
-            icon={<SettingsIcon/>}
+            icon={<MoreHoriz/>}
             tooltipTitle="More settings"
             onClick={toggleStyleDrawer}
           />
