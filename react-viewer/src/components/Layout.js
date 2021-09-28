@@ -62,7 +62,7 @@ export default function Layout({children}) {
             <IconButton onClick={toggleLightMode}>
               <ThemeIcon sx={{color: 'white'}}/>
             </IconButton>
-            <IconButton href="https://github.com/ricky26/open-air">
+            <IconButton href="https://github.com/ricky26/open-air" target="_blank">
               <img src={"/images/github-light-64px.png"} width="24px" height="24px" alt="View source on GitHub"/>
             </IconButton>
           </Toolbar>
