@@ -14,20 +14,23 @@ import Map from "./Map";
 import './App.css';
 import MapStyleView from "./MapStyleView";
 
-export default function MapView() {
-  const [transform, setTransform] = useState({
-    x: 0.49,
-    y: 0.32,
-    zoom: 5,
-    rotation: 0,
-  });
+function MapContainer(props) {
+  const {
+    initialTransform,
+    storeTransform,
+    style,
+    children,
+  } = props;
 
+  const [transform, setTransform] = useState(initialTransform);
   const onTransform = useCallback(({x, y, rotation, zoom}) => {
     x = Math.min(1, Math.max(0, x));
     y = Math.min(1, Math.max(0, y));
     zoom = Math.min(20, Math.max(0, zoom));
     setTransform({x, y, zoom, rotation});
-  }, [setTransform]);
+    storeTransform({x, y, zoom, rotation});
+  }, [setTransform, storeTransform]);
+
 
   const cache = Cache.default;
   const sections = SectionSource.default;
@@ -38,6 +41,29 @@ export default function MapView() {
   const groundLabels = useMemo(() => new LabelsRenderer(cache, sections, 1024), [cache, sections]);
   const pilots = useMemo(() => new PilotRenderer(whazzup, airlines), [whazzup, airlines]);
 
+  const render = useCallback(renderer => {
+    style.showLayer('GROUND') && groundTiles.draw(renderer, style);
+    style.showLayer('LABELS') && groundLabels.draw(renderer, style);
+    pilots.draw(renderer, style);
+  }, [style, groundTiles, groundLabels, pilots]);
+
+  return (
+    <Map
+      className="App-fill-parent"
+      containerClassName="App-viewport-overlay"
+      render={render}
+      x={transform.x}
+      y={transform.y}
+      zoom={transform.zoom}
+      rotation={transform.rotation}
+      onTransform={onTransform}>
+      {children}
+    </Map>
+  );
+}
+
+export default function MapView({initialTransform, setTransform}) {
+
   const [mapConfig, mapConfigDispatcher] = useMapConfig();
   const style = useMapStyle(mapConfig);
   const [showStyleDrawer, setShowStyleDrawer] = useState(false);
@@ -45,24 +71,12 @@ export default function MapView() {
     () => setShowStyleDrawer(!showStyleDrawer),
     [showStyleDrawer, setShowStyleDrawer]);
 
-  const render = useCallback(renderer => {
-    groundTiles.draw(renderer, style);
-    groundLabels.draw(renderer, style);
-    pilots.draw(renderer, style);
-  }, [style, groundTiles, groundLabels, pilots]);
-
   return (
     <div className="App-viewport">
-      <Map
-        className="App-fill-parent"
-        containerClassName="App-viewport-overlay"
-        render={render}
-        x={transform.x}
-        y={transform.y}
-        zoom={transform.zoom}
-        rotation={transform.rotation}
-        onTransform={onTransform}>
-
+      <MapContainer
+        initialTransform={initialTransform}
+        storeTransform={setTransform}
+        style={style}>
         <SpeedDial
           ariaLabel="style settings"
           hidden={showStyleDrawer}
@@ -106,7 +120,7 @@ export default function MapView() {
             </div>
           </div>
         </Drawer>
-      </Map>
+      </MapContainer>
     </div>
   );
 }

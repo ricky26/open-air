@@ -51,7 +51,9 @@ export const DEFAULT_PALETTE = {
 
 export const DEFAULT_LAYERS = {
   RUNWAYS: true,
+  GROUND: true,
   LABELS: true,
+
   COAST: true,
   PIER: true,
   DANGER: true,
